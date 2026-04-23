@@ -1,0 +1,40 @@
+# Android/Gradle build outputs
+.gradle/
+build/
+**/build/
+captures/
+outputs/
+
+# Local machine configuration
+local.properties
+*.iml
+
+# Android Studio / IntelliJ
+.idea/
+
+# Native and generated intermediates
+.cxx/
+externalNativeBuild/
+
+# Logs and OS clutter
+*.log
+.DS_Store
+Thumbs.db
+
+# Signing keys and local secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# Crash and profiling artifacts
+*.hprof
+
+# Kotlin/Java compiled artifacts
+*.class
+
+# Temporary editor files
+*.swp
+*.swo
+*~

@@ -424,7 +424,7 @@ private fun SettingsScreen(
     Text(text = "Sicurezza e comportamento dell'app", color = SoftText)
     ActionCard(title = "Accesso BLE") {
       Text(
-        text = if (uiState.bleSharedSecretConfigured) "Secret BLE configurato su questo dispositivo" else "Inserisci lo stesso secret configurato nel firmware ESPHome",
+        text = if (uiState.bleSharedSecretConfigured) "Chiave condivisa BLE" else "Inserisci lo stesso secret configurato nel firmware ESPHome",
         color = if (uiState.bleSharedSecretConfigured) AccentYellow else SoftText,
       )
       Spacer(modifier = Modifier.height(12.dp))
@@ -460,7 +460,7 @@ private fun SettingsScreen(
             contentColor = AppBackground,
           ),
         ) {
-          Text(if (uiState.bleSharedSecretConfigured) "Aggiorna secret" else "Salva secret")
+          Text(if (uiState.bleSharedSecretConfigured) "Aggiorna" else "Salva")
         }
         OutlinedButton(
           onClick = {

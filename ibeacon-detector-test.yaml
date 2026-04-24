@@ -263,6 +263,41 @@ esp32_ble_server:
           value:
             data: !lambda |-
               return std::vector<uint8_t>(id(ble_debug_text).begin(), id(ble_debug_text).end());
+        - id: ble_snapshot_characteristic
+          uuid: 19b10005-e8f2-537e-4f6c-d104768a1214
+          description: "Door snapshot"
+          read: true
+          value:
+            data: !lambda |-
+              char wifi_signal_buffer[16] = "";
+              if (id(wifi_signal_db).has_state()) {
+                snprintf(wifi_signal_buffer, sizeof(wifi_signal_buffer), "%.0f", id(wifi_signal_db).state);
+              }
+
+              char uptime_buffer[24] = "";
+              if (id(uptime_seconds).has_state()) {
+                snprintf(uptime_buffer, sizeof(uptime_buffer), "%.0f", id(uptime_seconds).state);
+              }
+
+              char cpu_temp_buffer[16] = "";
+              if (id(cpu_temperature).has_state()) {
+                snprintf(cpu_temp_buffer, sizeof(cpu_temp_buffer), "%.1f", id(cpu_temperature).state);
+              }
+
+              std::string payload;
+              payload += std::string("auto_open=") + (id(auto_relay_switch).state ? "1" : "0") + "\n";
+              payload += std::string("relay_lock=") + (id(relay_lock) ? "1" : "0") + "\n";
+              payload += std::string("relay_active=") + (id(relay_output).state ? "1" : "0") + "\n";
+              payload += std::string("wifi_status=") + (id(wifi_status).state ? "1" : "0") + "\n";
+              payload += std::string("bssid=") + id(wifi_bssid).state + "\n";
+              payload += std::string("boot_time=") + id(startup_time).state + "\n";
+              payload += std::string("cpu_temp_c=") + cpu_temp_buffer + "\n";
+              payload += std::string("ip=") + id(wifi_ip_address).state + "\n";
+              payload += std::string("mac=") + id(wifi_mac_address).state + "\n";
+              payload += std::string("ssid=") + id(wifi_ssid).state + "\n";
+              payload += std::string("uptime_s=") + uptime_buffer + "\n";
+              payload += std::string("wifi_signal_dbm=") + wifi_signal_buffer;
+              return std::vector<uint8_t>(payload.begin(), payload.end());
 
 time:
   - platform: sntp
@@ -439,16 +474,19 @@ binary_sensor:
 sensor:
   - platform: wifi_signal
     name: ${devicename} WiFi Signal
+    id: wifi_signal_db
     update_interval: 60s
     device_class: signal_strength
     entity_category: diagnostic
   - platform: uptime
     name: ${devicename} Uptime
+    id: uptime_seconds
     icon: mdi:clock
     device_class: duration
     update_interval: 60s
   - platform: internal_temperature
     name: ${devicename} CPU temperature
+    id: cpu_temperature
     update_interval: 60s
     device_class: temperature
     entity_category: diagnostic
@@ -462,15 +500,19 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: ${devicename} IP address
+      id: wifi_ip_address
       icon: mdi:access-point-network
     ssid:
       name: ${devicename} SSID
+      id: wifi_ssid
       icon: mdi:access-point-network
     bssid:
       name: ${devicename} BSSID
+      id: wifi_bssid
       icon: mdi:access-point-network
     mac_address:
       name: ${devicename} MAC address
+      id: wifi_mac_address
       icon: mdi:chip
   - platform: template
     name: ${devicename} Boot time

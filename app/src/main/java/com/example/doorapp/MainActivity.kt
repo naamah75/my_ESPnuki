@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,12 +31,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
@@ -61,12 +65,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -231,13 +241,13 @@ private fun HeaderRow(onOpenMenu: () -> Unit) {
     )
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
       Text(
-        text = "DOOR",
+        text = "ESPnuki",
         color = Color.White,
         style = MaterialTheme.typography.headlineLarge,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 6.sp,
+        letterSpacing = 1.sp,
       )
-      Text(text = "secondary BLE access", color = SoftText, style = MaterialTheme.typography.labelSmall)
+      Text(text = "accesso BLE locale", color = SoftText, style = MaterialTheme.typography.labelSmall)
     }
     Spacer(modifier = Modifier.size(10.dp))
   }
@@ -255,7 +265,7 @@ private fun DrawerContent(
   ModalDrawerSheet(drawerContainerColor = SheetBackground, drawerContentColor = Color.White) {
     Spacer(modifier = Modifier.height(24.dp))
     Text(
-      text = "Door App",
+      text = "ESPnuki",
       color = Color.White,
       style = MaterialTheme.typography.headlineSmall,
       modifier = Modifier.padding(horizontal = 24.dp),
@@ -449,6 +459,7 @@ private fun InfoScreen(uiState: DoorUiState) {
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Text(text = "Info", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    EspNukiLogoCard()
     InfoRow("Versione", BuildConfig.VERSION_NAME)
     InfoRow("Build", BuildConfig.BUILD_TIMESTAMP)
     InfoRow("Device BLE", BleDoorConfig.deviceName)
@@ -457,6 +468,97 @@ private fun InfoScreen(uiState: DoorUiState) {
       Spacer(modifier = Modifier.height(8.dp))
       Text(text = "Ultimo log", color = Color.White, style = MaterialTheme.typography.titleMedium)
       Text(text = uiState.log, color = SoftText, style = MaterialTheme.typography.bodySmall)
+    }
+  }
+}
+
+@Composable
+private fun EspNukiLogoCard() {
+  Card(
+    colors = CardDefaults.cardColors(containerColor = Color(0xFF080808)),
+    shape = RoundedCornerShape(28.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .widthIn(max = 420.dp),
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 20.dp, vertical = 24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      EspNukiLogoMark(
+        modifier = Modifier
+          .fillMaxWidth(0.72f)
+          .aspectRatio(1f),
+      )
+      Text(
+        text = buildAnnotatedString {
+          withStyle(style = androidx.compose.ui.text.SpanStyle(color = Color.White)) { append("ESP") }
+          withStyle(
+            style = androidx.compose.ui.text.SpanStyle(
+              color = AccentYellow,
+              baselineShift = BaselineShift(0.02f),
+            ),
+          ) { append("nuki") }
+        },
+        style = MaterialTheme.typography.headlineLarge,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.5.sp,
+      )
+    }
+  }
+}
+
+@Composable
+private fun EspNukiLogoMark(modifier: Modifier = Modifier) {
+  Canvas(modifier = modifier) {
+    val ringColor = Color(0xFFF7F4EF)
+    val centerColor = Color(0xFFFFD400)
+    val ringStroke = size.minDimension * 0.07f
+    val ringDiameter = size.minDimension * 0.5f
+    val ringTop = size.height * 0.14f
+    val ringLeft = (size.width - ringDiameter) / 2f
+    val ringCenterX = size.width / 2f
+    val ringBottom = ringTop + ringDiameter
+    val branchTop = ringBottom - ringStroke * 0.15f
+    val branchBottom = size.height * 0.86f
+    val leftX = ringCenterX - ringDiameter * 0.21f
+    val rightX = ringCenterX + ringDiameter * 0.21f
+    val branchOffset = ringDiameter * 0.18f
+    val nodeRadius = size.minDimension * 0.045f
+
+    drawCircle(
+      color = ringColor,
+      radius = ringDiameter / 2f,
+      center = Offset(ringCenterX, ringTop + ringDiameter / 2f),
+      style = Stroke(width = ringStroke),
+    )
+    drawCircle(
+      color = centerColor,
+      radius = ringDiameter * 0.085f,
+      center = Offset(ringCenterX, ringTop + ringDiameter / 2f),
+    )
+
+    fun drawBranch(startX: Float, endX: Float) {
+      drawLine(ringColor, Offset(startX, branchTop), Offset(startX, branchTop + size.height * 0.11f), strokeWidth = ringStroke, cap = StrokeCap.Round)
+      drawLine(ringColor, Offset(startX, branchTop + size.height * 0.11f), Offset(endX, branchTop + size.height * 0.19f), strokeWidth = ringStroke, cap = StrokeCap.Round)
+      drawLine(ringColor, Offset(endX, branchTop + size.height * 0.19f), Offset(endX, branchBottom - nodeRadius * 1.45f), strokeWidth = ringStroke, cap = StrokeCap.Round)
+    }
+
+    drawBranch(leftX, leftX - branchOffset)
+    drawLine(ringColor, Offset(ringCenterX, branchTop), Offset(ringCenterX, branchBottom - nodeRadius * 1.45f), strokeWidth = ringStroke, cap = StrokeCap.Round)
+    drawBranch(rightX, rightX + branchOffset)
+
+    val nodeCenters = listOf(
+      Offset(leftX - branchOffset, branchBottom),
+      Offset(ringCenterX, branchBottom),
+      Offset(rightX + branchOffset, branchBottom),
+    )
+    nodeCenters.forEach { center ->
+      drawCircle(color = ringColor, radius = nodeRadius, center = center)
+      drawCircle(color = Color(0xFF080808), radius = nodeRadius * 0.34f, center = center)
     }
   }
 }
@@ -582,7 +684,7 @@ private fun nukiSwitchColors() = SwitchDefaults.colors(
 
 private fun copyLogToClipboard(context: Context, text: String) {
   val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-  clipboard.setPrimaryClip(ClipData.newPlainText("Door App BLE Log", text))
+  clipboard.setPrimaryClip(ClipData.newPlainText("ESPnuki BLE Log", text))
   Toast.makeText(context, "Log copiato", Toast.LENGTH_SHORT).show()
 }
 

@@ -1,0 +1,17 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="168" fill="#080808"/>
+  <circle cx="512" cy="376" r="150" stroke="#F7F4EF" stroke-width="44"/>
+  <circle cx="512" cy="376" r="29" fill="#FFD400"/>
+  <path d="M441 530V612L390 663V739" stroke="#F7F4EF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M512 534V739" stroke="#F7F4EF" stroke-width="34" stroke-linecap="round"/>
+  <path d="M583 530V612L634 663V739" stroke="#F7F4EF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="390" cy="779" r="34" fill="#F7F4EF"/>
+  <circle cx="390" cy="779" r="12" fill="#080808"/>
+  <circle cx="512" cy="779" r="34" fill="#F7F4EF"/>
+  <circle cx="512" cy="779" r="12" fill="#080808"/>
+  <circle cx="634" cy="779" r="34" fill="#F7F4EF"/>
+  <circle cx="634" cy="779" r="12" fill="#080808"/>
+  <text x="512" y="905" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="116" font-weight="500" letter-spacing="1">
+    <tspan fill="#FFFFFF">ESP</tspan><tspan fill="#FFD400">nuki</tspan>
+  </text>
+</svg>

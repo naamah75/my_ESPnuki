@@ -1,7 +1,11 @@
 package com.example.doorapp
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -102,9 +106,19 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
       Text(text = "Scansiona BLE")
     }
 
+    if (uiState.log.isNotEmpty()) {
+      Button(
+        onClick = { copyLogToClipboard(context, uiState.log) },
+        enabled = !uiState.isBusy,
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(text = "Copia log")
+      }
+    }
+
     if (missingPermissions.isNotEmpty()) {
       Spacer(modifier = Modifier.height(12.dp))
-      Text(text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "Permessi BLE richiesti: scan e connect" else "Permesso posizione richiesto per BLE")
+      Text(text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "Permessi BLE richiesti: scan, connect e posizione" else "Permesso posizione richiesto per BLE")
     }
 
     if (uiState.isBusy) {
@@ -126,4 +140,10 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
       uiState.scanResults.forEach { Text(text = it) }
     }
   }
+}
+
+private fun copyLogToClipboard(context: Context, text: String) {
+  val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
+  clipboard.setPrimaryClip(ClipData.newPlainText("Door App BLE Log", text))
+  Toast.makeText(context, "Log copiato", Toast.LENGTH_SHORT).show()
 }

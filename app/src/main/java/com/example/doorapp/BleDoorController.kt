@@ -10,12 +10,16 @@ import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanRecord
 import android.bluetooth.le.ScanSettings
 import android.bluetooth.le.ScanCallback
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.location.LocationManager
+import android.os.ParcelUuid
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -59,9 +63,7 @@ class BleDoorController(private val context: Context) {
     val adapter: BluetoothAdapter = manager.adapter
       ?: return Result.Failure("Bluetooth non disponibile", lines.joinToString("\n"))
 
-    log("[bt] adapter enabled=${adapter.isEnabled} state=${adapterStateName(adapter.state)}")
-    log("[bt] scanner available=${adapter.bluetoothLeScanner != null}")
-    log("[bt] location enabled=${isLocationEnabled(context)}")
+    logEnvironment(context, adapter, ::log)
 
     if (!adapter.isEnabled) {
       return Result.Failure("Attiva il Bluetooth sul telefono", lines.joinToString("\n"))
@@ -150,9 +152,7 @@ class BleDoorController(private val context: Context) {
     val adapter: BluetoothAdapter = manager.adapter
       ?: return BleScanResult.Failure("Bluetooth non disponibile", lines.joinToString("\n"), emptyList())
 
-    log("[bt] adapter enabled=${adapter.isEnabled} state=${adapterStateName(adapter.state)}")
-    log("[bt] scanner available=${adapter.bluetoothLeScanner != null}")
-    log("[bt] location enabled=${isLocationEnabled(context)}")
+    logEnvironment(context, adapter, ::log)
 
     if (!adapter.isEnabled) {
       return BleScanResult.Failure("Attiva il Bluetooth sul telefono", lines.joinToString("\n"), emptyList())
@@ -176,6 +176,9 @@ class BleDoorController(private val context: Context) {
     val settings = ScanSettings.Builder()
       .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
       .build()
+    val serviceFilter = ScanFilter.Builder()
+      .setServiceUuid(ParcelUuid(BleDoorConfig.serviceUuid))
+      .build()
 
     val callback = object : ScanCallback() {
       override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult) {
@@ -183,7 +186,7 @@ class BleDoorController(private val context: Context) {
         val record = result.scanRecord
         val advName = record?.deviceName
         val serviceUuids = record?.serviceUuids.orEmpty()
-        log("[scan] result cb=$callbackType rssi=${result.rssi} name=${device.name ?: "<null>"} adv=${advName ?: "<null>"} addr=${device.address} uuids=${serviceUuids.joinToString { it.uuid.toString() }} raw=${scanRecordSummary(record)}")
+        log("[scan] result cb=$callbackType ${scanResultSummary(result, record, advName, serviceUuids)}")
         val matchesName = device.name == BleDoorConfig.deviceName || advName == BleDoorConfig.deviceName
         val matchesService = serviceUuids.any { it.uuid == BleDoorConfig.serviceUuid }
         if ((matchesName || matchesService) && !found.isCompleted) {
@@ -204,15 +207,29 @@ class BleDoorController(private val context: Context) {
       }
     }
 
-    log("[scan] start filters=none mode=LOW_LATENCY target=${BleDoorConfig.deviceName}|${BleDoorConfig.serviceUuid}")
-    val modernResult = try {
-      scanner.startScan(null, settings, callback)
-      withTimeout(10_000) { found.await() }
+    log("[scan] start pass=service-filter ${scanSettingsSummary(settings)} service=${BleDoorConfig.serviceUuid}")
+    val filteredResult = try {
+      scanner.startScan(listOf(serviceFilter), settings, callback)
+      withTimeout(8_000) { found.await() }
     } catch (_: TimeoutCancellationException) {
-      log("[scan] modern timeout, provo fallback legacy")
+      log("[scan] service-filter timeout, provo pass unfiltered")
       null
     } finally {
-      log("[scan] stop")
+      log("[scan] stop pass=service-filter")
+      scanner.stopScan(callback)
+    }
+
+    if (filteredResult != null) return filteredResult
+
+    log("[scan] start pass=unfiltered ${scanSettingsSummary(settings)} target=${BleDoorConfig.deviceName}|${BleDoorConfig.serviceUuid}")
+    val modernResult = try {
+      scanner.startScan(null, settings, callback)
+      withTimeout(6_000) { found.await() }
+    } catch (_: TimeoutCancellationException) {
+      log("[scan] unfiltered timeout, provo fallback legacy")
+      null
+    } finally {
+      log("[scan] stop pass=unfiltered")
       scanner.stopScan(callback)
     }
 
@@ -235,9 +252,9 @@ class BleDoorController(private val context: Context) {
       override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult) {
         val device = result.device ?: return
         val record = result.scanRecord
-        val advName = record?.deviceName ?: "<null>"
-        val serviceUuids = record?.serviceUuids.orEmpty().joinToString { it.uuid.toString() }
-        val line = "name=${device.name ?: "<null>"} adv=$advName addr=${device.address} rssi=${result.rssi} uuids=$serviceUuids raw=${scanRecordSummary(record)}"
+        val advName = record?.deviceName
+        val serviceUuids = record?.serviceUuids.orEmpty()
+        val line = scanResultSummary(result, record, advName, serviceUuids)
         if (devices.add(line)) {
           log("[scan-all] $line")
         }
@@ -255,7 +272,7 @@ class BleDoorController(private val context: Context) {
       }
     }
 
-    log("[scan-all] start mode=LOW_LATENCY duration_ms=$durationMs")
+    log("[scan-all] start ${scanSettingsSummary(settings)} duration_ms=$durationMs")
     val devicesFound = try {
       scanner.startScan(null, settings, callback)
       withTimeout(durationMs + 2_000) {
@@ -281,8 +298,7 @@ class BleDoorController(private val context: Context) {
     val found = CompletableDeferred<BluetoothDevice?>()
     val callback = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
       val advName = parseAdvName(scanRecord)
-      val line = bytesSummary(scanRecord)
-      log("[scan-legacy] result rssi=$rssi name=${device.name ?: "<null>"} adv=${advName ?: "<null>"} addr=${device.address} raw=$line")
+      log("[scan-legacy] result rssi=$rssi name=${device.name ?: "<null>"} adv=${advName ?: "<null>"} addr=${device.address} raw=${bytesSummary(scanRecord)}")
       val matchesName = device.name == BleDoorConfig.deviceName || advName == BleDoorConfig.deviceName
       if (matchesName && !found.isCompleted) {
         log("[scan-legacy] target match by name")
@@ -298,6 +314,7 @@ class BleDoorController(private val context: Context) {
     return try {
       withTimeout(5_000) { found.await() }
     } catch (_: TimeoutCancellationException) {
+      log("[scan-legacy] timeout")
       null
     } finally {
       log("[scan-legacy] stop")
@@ -324,12 +341,27 @@ class BleDoorController(private val context: Context) {
 
     return try {
       delay(durationMs)
+      log("[scan-all-legacy] collected=${devices.size}")
       devices.toList()
     } finally {
       log("[scan-all-legacy] stop")
       adapter.stopLeScan(callback)
     }
   }
+}
+
+private fun logEnvironment(context: Context, adapter: BluetoothAdapter, log: (String) -> Unit) {
+  log("[env] sdk=${Build.VERSION.SDK_INT} release=${Build.VERSION.RELEASE} manufacturer=${Build.MANUFACTURER} model=${Build.MODEL}")
+  log("[env] target name=${BleDoorConfig.deviceName} service=${BleDoorConfig.serviceUuid}")
+  log("[perm] required=${BlePermissions.required().joinToString()} missing=${BlePermissions.missing(context).joinToString().ifBlank { "<none>" }}")
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    log("[perm] scan=${permissionState(context, android.Manifest.permission.BLUETOOTH_SCAN)} connect=${permissionState(context, android.Manifest.permission.BLUETOOTH_CONNECT)} fine_location=${permissionState(context, android.Manifest.permission.ACCESS_FINE_LOCATION)}")
+  } else {
+    log("[perm] fine_location=${permissionState(context, android.Manifest.permission.ACCESS_FINE_LOCATION)}")
+  }
+  log("[bt] adapter enabled=${adapter.isEnabled} state=${adapterStateName(adapter.state)}")
+  log("[bt] scanner available=${adapter.bluetoothLeScanner != null} offloaded_filtering=${adapter.isOffloadedFilteringSupported} offloaded_scan_batching=${adapter.isOffloadedScanBatchingSupported} multiple_advertisement=${adapter.isMultipleAdvertisementSupported}")
+  log("[bt] location enabled=${isLocationEnabled(context)}")
 }
 
 @SuppressLint("MissingPermission")
@@ -514,9 +546,31 @@ private fun scanRecordSummary(record: ScanRecord?): String {
   return bytesSummary(record.bytes)
 }
 
+private fun scanResultSummary(
+  result: android.bluetooth.le.ScanResult,
+  record: ScanRecord?,
+  advName: String?,
+  serviceUuids: List<ParcelUuid>,
+): String {
+  val device = result.device
+  return "rssi=${result.rssi} name=${device?.name ?: "<null>"} adv=${advName ?: "<null>"} addr=${device?.address ?: "<null>"} uuids=${serviceUuids.joinToString { it.uuid.toString() }.ifBlank { "<none>" }} legacy=${result.isLegacy} connectable=${result.isConnectable} raw=${scanRecordSummary(record)}"
+}
+
+private fun scanSettingsSummary(settings: ScanSettings): String {
+  return "mode=${settings.scanMode} callback_type=${settings.callbackType} report_delay_ms=${settings.reportDelayMillis}"
+}
+
 private fun bytesSummary(bytes: ByteArray?): String {
   if (bytes == null) return "<empty>"
   return bytes.take(24).joinToString(separator = "") { "%02X".format(it) }
+}
+
+private fun permissionState(context: Context, permission: String): String {
+  return if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+    "granted"
+  } else {
+    "missing"
+  }
 }
 
 private fun parseAdvName(scanRecord: ByteArray?): String? {

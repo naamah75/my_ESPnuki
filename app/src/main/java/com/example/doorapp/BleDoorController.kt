@@ -30,6 +30,12 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 class BleDoorController(private val context: Context) {
+  data class DeviceMatch(
+    val device: BluetoothDevice,
+    val rssi: Int,
+    val connectable: Boolean,
+  )
+
   sealed interface BleScanResult {
     data class Success(val devices: List<String>) : BleScanResult
     data class Failure(val message: String, val log: String, val devices: List<String>) : BleScanResult
@@ -41,9 +47,22 @@ class BleDoorController(private val context: Context) {
       val response: String,
       val status: String,
       val debug: String,
+      val discovery: DeviceMatch,
     ) : Result
 
     data class Failure(val message: String, val log: String) : Result
+  }
+
+  sealed interface SnapshotResult {
+    data class Success(val fields: List<PeripheralField>, val log: String, val discovery: DeviceMatch) : SnapshotResult
+
+    data class Failure(val message: String, val log: String) : SnapshotResult
+  }
+
+  sealed interface CommandResult {
+    data class Success(val message: String, val log: String, val discovery: DeviceMatch) : CommandResult
+
+    data class Failure(val message: String, val log: String) : CommandResult
   }
 
   @SuppressLint("MissingPermission")
@@ -73,13 +92,14 @@ class BleDoorController(private val context: Context) {
       try {
         withTimeout(25_000) {
           log("[scan] avvio ricerca ${BleDoorConfig.deviceName}")
-          val device = scanForDevice(adapter, ::log)
+          val discovery = scanForDevice(adapter, ::log)
             ?: run {
               log("[scan] target non trovato, avvio scansione estesa di debug")
               val nearby = scanAllDevices(adapter, ::log, durationMs = 5_000)
               val suffix = if (nearby.isEmpty()) "nessun device BLE rilevato" else "visti ${nearby.size} device BLE"
               return@withTimeout Result.Failure("Device ${BleDoorConfig.deviceName} non trovato ($suffix)", lines.joinToString("\n"))
             }
+          val device = discovery.device
 
           log("[scan] trovato device name=${device.name ?: "<null>"} address=${device.address}")
 
@@ -111,6 +131,7 @@ class BleDoorController(private val context: Context) {
                 response = response,
                 status = "Porta aperta",
                 debug = debug.ifBlank { "OK" },
+                discovery = discovery,
               )
             } else {
               Result.Failure(
@@ -170,9 +191,9 @@ class BleDoorController(private val context: Context) {
   }
 
   @SuppressLint("MissingPermission")
-  private suspend fun scanForDevice(adapter: BluetoothAdapter, log: (String) -> Unit): BluetoothDevice? {
+  private suspend fun scanForDevice(adapter: BluetoothAdapter, log: (String) -> Unit): DeviceMatch? {
     val scanner = adapter.bluetoothLeScanner ?: return null
-    val found = CompletableDeferred<BluetoothDevice?>()
+    val found = CompletableDeferred<DeviceMatch?>()
     val settings = ScanSettings.Builder()
       .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
       .build()
@@ -191,7 +212,7 @@ class BleDoorController(private val context: Context) {
         val matchesService = serviceUuids.any { it.uuid == BleDoorConfig.serviceUuid }
         if ((matchesName || matchesService) && !found.isCompleted) {
           log("[scan] target match by ${if (matchesName && matchesService) "name+service" else if (matchesName) "name" else "service"}")
-          found.complete(device)
+          found.complete(DeviceMatch(device = device, rssi = result.rssi, connectable = result.isConnectable))
         }
       }
 
@@ -294,15 +315,15 @@ class BleDoorController(private val context: Context) {
 
   @Suppress("DEPRECATION")
   @SuppressLint("MissingPermission")
-  private suspend fun scanForDeviceLegacy(adapter: BluetoothAdapter, log: (String) -> Unit): BluetoothDevice? {
-    val found = CompletableDeferred<BluetoothDevice?>()
+  private suspend fun scanForDeviceLegacy(adapter: BluetoothAdapter, log: (String) -> Unit): DeviceMatch? {
+    val found = CompletableDeferred<DeviceMatch?>()
     val callback = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
       val advName = parseAdvName(scanRecord)
       log("[scan-legacy] result rssi=$rssi name=${device.name ?: "<null>"} adv=${advName ?: "<null>"} addr=${device.address} raw=${bytesSummary(scanRecord)}")
       val matchesName = device.name == BleDoorConfig.deviceName || advName == BleDoorConfig.deviceName
       if (matchesName && !found.isCompleted) {
         log("[scan-legacy] target match by name")
-        found.complete(device)
+        found.complete(DeviceMatch(device = device, rssi = rssi, connectable = true))
       }
     }
 
@@ -346,6 +367,107 @@ class BleDoorController(private val context: Context) {
     } finally {
       log("[scan-all-legacy] stop")
       adapter.stopLeScan(callback)
+    }
+  }
+
+  @SuppressLint("MissingPermission")
+  suspend fun readSnapshot(onLog: (String) -> Unit): SnapshotResult {
+    val lines = mutableListOf<String>()
+    fun log(message: String) {
+      lines += message
+      onLog(message)
+    }
+
+    if (!BlePermissions.hasAll(context)) {
+      return SnapshotResult.Failure("Concedi i permessi Bluetooth all'app", lines.joinToString("\n"))
+    }
+
+    val manager = context.getSystemService(BluetoothManager::class.java)
+      ?: return SnapshotResult.Failure("BluetoothManager non disponibile", lines.joinToString("\n"))
+    val adapter: BluetoothAdapter = manager.adapter
+      ?: return SnapshotResult.Failure("Bluetooth non disponibile", lines.joinToString("\n"))
+
+    logEnvironment(context, adapter, ::log)
+
+    if (!adapter.isEnabled) {
+      return SnapshotResult.Failure("Attiva il Bluetooth sul telefono", lines.joinToString("\n"))
+    }
+
+    return try {
+      withBleSession(adapter, ::log, timeoutMs = 20_000) { session, discovery ->
+        val payload = session.readAscii(BleDoorConfig.snapshotUuid)
+        log("[snapshot] bytes=${payload.length}")
+        SnapshotResult.Success(parseSnapshotFields(payload), lines.joinToString("\n"), discovery)
+      }
+    } catch (e: Exception) {
+      log("[error] ${e.message ?: "Errore BLE"}")
+      SnapshotResult.Failure(e.message ?: "Errore BLE", lines.joinToString("\n"))
+    }
+  }
+
+  @SuppressLint("MissingPermission")
+  suspend fun sendCommand(command: String, successMessage: String, onLog: (String) -> Unit): CommandResult {
+    val lines = mutableListOf<String>()
+    fun log(message: String) {
+      lines += message
+      onLog(message)
+    }
+
+    if (!BlePermissions.hasAll(context)) {
+      return CommandResult.Failure("Concedi i permessi Bluetooth all'app", lines.joinToString("\n"))
+    }
+
+    val manager = context.getSystemService(BluetoothManager::class.java)
+      ?: return CommandResult.Failure("BluetoothManager non disponibile", lines.joinToString("\n"))
+    val adapter: BluetoothAdapter = manager.adapter
+      ?: return CommandResult.Failure("Bluetooth non disponibile", lines.joinToString("\n"))
+
+    logEnvironment(context, adapter, ::log)
+
+    if (!adapter.isEnabled) {
+      return CommandResult.Failure("Attiva il Bluetooth sul telefono", lines.joinToString("\n"))
+    }
+
+    return try {
+      withBleSession(adapter, ::log, timeoutMs = 20_000) { session, discovery ->
+        log("[command] write=$command")
+        session.writeAscii(BleDoorConfig.commandUuid, command)
+        CommandResult.Success(successMessage, lines.joinToString("\n"), discovery)
+      }
+    } catch (e: Exception) {
+      log("[error] ${e.message ?: "Errore BLE"}")
+      CommandResult.Failure(e.message ?: "Errore BLE", lines.joinToString("\n"))
+    }
+  }
+
+  private suspend fun <T> withBleSession(
+    adapter: BluetoothAdapter,
+    log: (String) -> Unit,
+    timeoutMs: Long,
+    block: suspend (GattSession, DeviceMatch) -> T,
+  ): T {
+    return withContext(Dispatchers.IO) {
+      try {
+        withTimeout(timeoutMs) {
+          log("[session] avvio ricerca ${BleDoorConfig.deviceName}")
+          val discovery = scanForDevice(adapter, log)
+            ?: throw IllegalStateException("Device ${BleDoorConfig.deviceName} non trovato")
+
+          log("[session] trovato device name=${discovery.device.name ?: "<null>"} address=${discovery.device.address} rssi=${discovery.rssi}")
+          val session = GattSession(context, discovery.device, log)
+          try {
+            log("[gatt] connect start")
+            session.connect()
+            log("[gatt] connect ok")
+            block(session, discovery)
+          } finally {
+            log("[gatt] close")
+            session.close()
+          }
+        }
+      } catch (e: TimeoutCancellationException) {
+        throw IllegalStateException("Timeout BLE", e)
+      }
     }
   }
 }
@@ -571,6 +693,43 @@ private fun permissionState(context: Context, permission: String): String {
   } else {
     "missing"
   }
+}
+
+private fun parseSnapshotFields(payload: String): List<PeripheralField> {
+  return payload
+    .lineSequence()
+    .mapNotNull { line ->
+      val separator = line.indexOf('=')
+      if (separator <= 0) return@mapNotNull null
+      val key = line.substring(0, separator)
+      val rawValue = line.substring(separator + 1)
+      PeripheralField(label = snapshotLabelForKey(key), value = snapshotValueForKey(key, rawValue))
+    }
+    .toList()
+}
+
+private fun snapshotLabelForKey(key: String): String = when (key) {
+  "auto_open" -> "Automazione apertura"
+  "relay_lock" -> "Relay Lock"
+  "relay_active" -> "Relay attivo"
+  "wifi_status" -> "WiFi connesso"
+  "bssid" -> "BSSID"
+  "boot_time" -> "Boot time"
+  "cpu_temp_c" -> "CPU temperature"
+  "ip" -> "IP address"
+  "mac" -> "MAC address"
+  "ssid" -> "SSID"
+  "uptime_s" -> "Uptime"
+  "wifi_signal_dbm" -> "WiFi Signal"
+  else -> key.replace('_', ' ')
+}
+
+private fun snapshotValueForKey(key: String, rawValue: String): String = when (key) {
+  "auto_open", "relay_lock", "relay_active", "wifi_status" -> if (rawValue == "1") "On" else "Off"
+  "cpu_temp_c" -> rawValue.ifBlank { "-" }.let { if (it == "-") it else "$it C" }
+  "wifi_signal_dbm" -> rawValue.ifBlank { "-" }.let { if (it == "-") it else "$it dBm" }
+  "uptime_s" -> rawValue.ifBlank { "-" }.let { if (it == "-") it else "$it s" }
+  else -> rawValue.ifBlank { "-" }
 }
 
 private fun parseAdvName(scanRecord: ByteArray?): String? {

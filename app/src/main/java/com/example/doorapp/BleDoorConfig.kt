@@ -11,4 +11,6 @@ object BleDoorConfig {
   val responseUuid: UUID = UUID.fromString("19b10002-e8f2-537e-4f6c-d104768a1214")
   val statusUuid: UUID = UUID.fromString("19b10003-e8f2-537e-4f6c-d104768a1214")
   val debugUuid: UUID = UUID.fromString("19b10004-e8f2-537e-4f6c-d104768a1214")
+  val snapshotUuid: UUID = UUID.fromString("19b10005-e8f2-537e-4f6c-d104768a1214")
+  val commandUuid: UUID = UUID.fromString("19b10006-e8f2-537e-4f6c-d104768a1214")
 }

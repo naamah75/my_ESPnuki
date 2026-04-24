@@ -65,6 +65,8 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
   ) {
     Text(text = "Door App", style = MaterialTheme.typography.headlineMedium)
     Spacer(modifier = Modifier.height(8.dp))
+    Text(text = "Versione: ${BuildConfig.VERSION_NAME}")
+    Text(text = "Build: ${BuildConfig.BUILD_TIMESTAMP}")
     Text(text = "Device: ${BleDoorConfig.deviceName}")
     Spacer(modifier = Modifier.height(24.dp))
 

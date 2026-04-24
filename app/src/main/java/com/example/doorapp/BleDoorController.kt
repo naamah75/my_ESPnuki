@@ -205,13 +205,21 @@ class BleDoorController(private val context: Context) {
     }
 
     log("[scan] start filters=none mode=LOW_LATENCY target=${BleDoorConfig.deviceName}|${BleDoorConfig.serviceUuid}")
-    scanner.startScan(null, settings, callback)
-    return try {
+    val modernResult = try {
+      scanner.startScan(null, settings, callback)
       withTimeout(10_000) { found.await() }
+    } catch (_: TimeoutCancellationException) {
+      log("[scan] modern timeout, provo fallback legacy")
+      null
     } finally {
       log("[scan] stop")
       scanner.stopScan(callback)
     }
+
+    if (modernResult != null) return modernResult
+
+    log("[scan-legacy] fallback start")
+    return scanForDeviceLegacy(adapter, log)
   }
 
   @SuppressLint("MissingPermission")
@@ -248,8 +256,8 @@ class BleDoorController(private val context: Context) {
     }
 
     log("[scan-all] start mode=LOW_LATENCY duration_ms=$durationMs")
-    scanner.startScan(null, settings, callback)
-    return try {
+    val devicesFound = try {
+      scanner.startScan(null, settings, callback)
       withTimeout(durationMs + 2_000) {
         delay(durationMs)
         done.complete(Unit)
@@ -259,6 +267,67 @@ class BleDoorController(private val context: Context) {
     } finally {
       log("[scan-all] stop")
       scanner.stopScan(callback)
+    }
+
+    if (devicesFound.isNotEmpty()) return devicesFound
+
+    log("[scan-all-legacy] fallback start")
+    return scanAllDevicesLegacy(adapter, log, durationMs)
+  }
+
+  @Suppress("DEPRECATION")
+  @SuppressLint("MissingPermission")
+  private suspend fun scanForDeviceLegacy(adapter: BluetoothAdapter, log: (String) -> Unit): BluetoothDevice? {
+    val found = CompletableDeferred<BluetoothDevice?>()
+    val callback = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
+      val advName = parseAdvName(scanRecord)
+      val line = bytesSummary(scanRecord)
+      log("[scan-legacy] result rssi=$rssi name=${device.name ?: "<null>"} adv=${advName ?: "<null>"} addr=${device.address} raw=$line")
+      val matchesName = device.name == BleDoorConfig.deviceName || advName == BleDoorConfig.deviceName
+      if (matchesName && !found.isCompleted) {
+        log("[scan-legacy] target match by name")
+        found.complete(device)
+      }
+    }
+
+    if (!adapter.startLeScan(callback)) {
+      log("[scan-legacy] start failed")
+      return null
+    }
+
+    return try {
+      withTimeout(5_000) { found.await() }
+    } catch (_: TimeoutCancellationException) {
+      null
+    } finally {
+      log("[scan-legacy] stop")
+      adapter.stopLeScan(callback)
+    }
+  }
+
+  @Suppress("DEPRECATION")
+  @SuppressLint("MissingPermission")
+  private suspend fun scanAllDevicesLegacy(adapter: BluetoothAdapter, log: (String) -> Unit, durationMs: Long): List<String> {
+    val devices = linkedSetOf<String>()
+    val callback = BluetoothAdapter.LeScanCallback { device, rssi, scanRecord ->
+      val advName = parseAdvName(scanRecord) ?: "<null>"
+      val line = "name=${device.name ?: "<null>"} adv=$advName addr=${device.address} rssi=$rssi raw=${bytesSummary(scanRecord)}"
+      if (devices.add(line)) {
+        log("[scan-all-legacy] $line")
+      }
+    }
+
+    if (!adapter.startLeScan(callback)) {
+      log("[scan-all-legacy] start failed")
+      return emptyList()
+    }
+
+    return try {
+      delay(durationMs)
+      devices.toList()
+    } finally {
+      log("[scan-all-legacy] stop")
+      adapter.stopLeScan(callback)
     }
   }
 }
@@ -334,6 +403,7 @@ private class GattSession(
       }
     }
 
+    @Suppress("DEPRECATION")
     @Deprecated("Deprecated in Java")
     override fun onCharacteristicRead(
       gatt: BluetoothGatt,
@@ -441,8 +511,31 @@ private fun scanFailureReason(errorCode: Int): String = when (errorCode) {
 
 private fun scanRecordSummary(record: ScanRecord?): String {
   if (record == null) return "<null>"
-  val bytes = record.bytes ?: return "<empty>"
+  return bytesSummary(record.bytes)
+}
+
+private fun bytesSummary(bytes: ByteArray?): String {
+  if (bytes == null) return "<empty>"
   return bytes.take(24).joinToString(separator = "") { "%02X".format(it) }
+}
+
+private fun parseAdvName(scanRecord: ByteArray?): String? {
+  if (scanRecord == null) return null
+  var index = 0
+  while (index < scanRecord.size) {
+    val length = scanRecord[index].toInt() and 0xFF
+    if (length == 0) break
+    val typeIndex = index + 1
+    val dataIndex = index + 2
+    val endIndex = index + 1 + length
+    if (endIndex > scanRecord.size) break
+    val type = scanRecord[typeIndex].toInt() and 0xFF
+    if (type == 0x08 || type == 0x09) {
+      return scanRecord.copyOfRange(dataIndex, endIndex).toString(StandardCharsets.UTF_8)
+    }
+    index += length + 1
+  }
+  return null
 }
 
 private fun adapterStateName(state: Int): String = when (state) {

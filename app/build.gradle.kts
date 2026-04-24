@@ -1,3 +1,10 @@
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+
+val buildTimestamp = ZonedDateTime.now(ZoneId.systemDefault())
+  .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z"))
+
 plugins {
   id("com.android.application")
   id("org.jetbrains.kotlin.android")
@@ -13,6 +20,7 @@ android {
     targetSdk = 34
     versionCode = 1
     versionName = "0.1.0"
+    buildConfigField("String", "BUILD_TIMESTAMP", "\"$buildTimestamp\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -37,6 +45,7 @@ android {
   }
 
   buildFeatures {
+    buildConfig = true
     compose = true
   }
 

@@ -73,8 +73,9 @@ class BleDoorController(private val context: Context) {
       onLog(message)
     }
 
-    if (BleDoorConfig.sharedSecret.isBlank()) {
-      return Result.Failure("Configura bleSharedSecret in local.properties prima di usare lo sblocco", lines.joinToString("\n"))
+    val sharedSecret = BleDoorConfig.sharedSecret(context)
+    if (sharedSecret.isBlank()) {
+      return Result.Failure("Configura il BLE shared secret nelle impostazioni prima di usare lo sblocco", lines.joinToString("\n"))
     }
 
     if (!BlePermissions.hasAll(context)) {
@@ -119,7 +120,7 @@ class BleDoorController(private val context: Context) {
             }
             log("[gatt] challenge=$challenge")
 
-            val response = Fnv1a.responseFor(challenge, BleDoorConfig.sharedSecret)
+            val response = Fnv1a.responseFor(challenge, sharedSecret)
             log("[gatt] response=$response")
             session.writeAscii(BleDoorConfig.responseUuid, response)
             log("[gatt] write response ok")

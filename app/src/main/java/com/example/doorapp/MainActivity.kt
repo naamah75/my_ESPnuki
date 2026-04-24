@@ -43,6 +43,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -50,6 +51,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -62,6 +65,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -216,6 +220,7 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
             AppScreen.SETTINGS -> SettingsScreen(
               uiState = uiState,
               onSetBiometricProtection = { enabled -> viewModel.setBiometricProtection(enabled) },
+              onSaveBleSharedSecret = { secret -> viewModel.setBleSharedSecret(secret) },
             )
 
             AppScreen.INFO -> InfoScreen(uiState = uiState)
@@ -402,7 +407,13 @@ private fun ActionsScreen(
 }
 
 @Composable
-private fun SettingsScreen(uiState: DoorUiState, onSetBiometricProtection: (Boolean) -> Unit) {
+private fun SettingsScreen(
+  uiState: DoorUiState,
+  onSetBiometricProtection: (Boolean) -> Unit,
+  onSaveBleSharedSecret: (String) -> Unit,
+) {
+  var secretInput by rememberSaveable(uiState.bleSharedSecret) { mutableStateOf(uiState.bleSharedSecret) }
+
   Column(
     modifier = Modifier
       .fillMaxSize()
@@ -411,6 +422,63 @@ private fun SettingsScreen(uiState: DoorUiState, onSetBiometricProtection: (Bool
   ) {
     Text(text = "Impostazioni", color = Color.White, style = MaterialTheme.typography.headlineMedium)
     Text(text = "Sicurezza e comportamento dell'app", color = SoftText)
+    ActionCard(title = "Accesso BLE") {
+      Text(
+        text = if (uiState.bleSharedSecretConfigured) "Secret BLE configurato su questo dispositivo" else "Inserisci lo stesso secret configurato nel firmware ESPHome",
+        color = if (uiState.bleSharedSecretConfigured) AccentYellow else SoftText,
+      )
+      Spacer(modifier = Modifier.height(12.dp))
+      OutlinedTextField(
+        value = secretInput,
+        onValueChange = { secretInput = it },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        label = { Text("BLE shared secret", color = SoftText) },
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+        colors = OutlinedTextFieldDefaults.colors(
+          focusedTextColor = Color.White,
+          unfocusedTextColor = Color.White,
+          focusedBorderColor = AccentYellow,
+          unfocusedBorderColor = Color.White.copy(alpha = 0.24f),
+          focusedLabelColor = AccentYellow,
+          unfocusedLabelColor = SoftText,
+          cursorColor = AccentYellow,
+          focusedContainerColor = Color.Transparent,
+          unfocusedContainerColor = Color.Transparent,
+        ),
+      )
+      Spacer(modifier = Modifier.height(12.dp))
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Button(
+          onClick = { onSaveBleSharedSecret(secretInput) },
+          modifier = Modifier.weight(1f),
+          colors = ButtonDefaults.buttonColors(
+            containerColor = AccentYellow,
+            contentColor = AppBackground,
+          ),
+        ) {
+          Text(if (uiState.bleSharedSecretConfigured) "Aggiorna secret" else "Salva secret")
+        }
+        OutlinedButton(
+          onClick = {
+            secretInput = ""
+            onSaveBleSharedSecret("")
+          },
+          modifier = Modifier.weight(1f),
+        ) {
+          Text("Rimuovi", color = AccentYellow)
+        }
+      }
+      Spacer(modifier = Modifier.height(8.dp))
+      Text(
+        text = "Il valore deve coincidere con ble_shared_secret nel file secrets.yaml del firmware.",
+        color = SoftText,
+        style = MaterialTheme.typography.bodySmall,
+      )
+    }
     ActionCard(title = "Sicurezza") {
       Row(
         modifier = Modifier.fillMaxWidth(),

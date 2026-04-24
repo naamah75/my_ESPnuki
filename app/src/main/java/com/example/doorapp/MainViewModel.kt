@@ -14,9 +14,12 @@ import kotlinx.coroutines.launch
 class MainViewModel(application: Application) : AndroidViewModel(application) {
   private val controller = BleDoorController(application.applicationContext)
   private val prefs = application.getSharedPreferences("door_app", Context.MODE_PRIVATE)
+  private val appContext = application.applicationContext
 
   private val _uiState = MutableStateFlow(
     DoorUiState(
+      bleSharedSecret = BleDoorConfig.sharedSecret(application.applicationContext),
+      bleSharedSecretConfigured = BleDoorConfig.hasSharedSecret(application.applicationContext),
       biometricProtectionEnabled = prefs.getBoolean("biometric_protection", false),
       biometricAvailable = isBiometricAvailable(application.applicationContext),
     ),
@@ -30,6 +33,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
   fun setBiometricProtection(enabled: Boolean) {
     prefs.edit().putBoolean("biometric_protection", enabled).apply()
     _uiState.value = _uiState.value.copy(biometricProtectionEnabled = enabled)
+  }
+
+  fun setBleSharedSecret(value: String) {
+    BleDoorConfig.saveSharedSecret(appContext, value)
+    val normalized = BleDoorConfig.sharedSecret(appContext)
+    _uiState.value = _uiState.value.copy(
+      bleSharedSecret = normalized,
+      bleSharedSecretConfigured = normalized.isNotBlank(),
+    )
   }
 
   fun openDoor() {

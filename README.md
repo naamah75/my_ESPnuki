@@ -62,13 +62,20 @@ Sono stati esclusi o spostati fuori dal codice versionato:
 
 ### Android
 
-Per usare davvero lo sblocco BLE devi aggiungere il secret locale in `local.properties`:
+Per usare davvero lo sblocco BLE l'app deve conoscere il `BLE shared secret`.
+
+Puoi configurarlo in due modi:
+
+1. direttamente nell'app, in `Impostazioni` -> `Accesso BLE`
+2. in fase di build tramite `local.properties`:
 
 ```properties
 bleSharedSecret=YOUR_REAL_SECRET
 ```
 
 Se il secret non e' presente, l'app continua a compilare ma lo sblocco BLE viene bloccato con un messaggio esplicito.
+
+Il valore da inserire nell'app deve essere identico a quello configurato nel firmware ESPHome con la chiave `ble_shared_secret`.
 
 ### ESPHome
 
@@ -79,6 +86,16 @@ Parti dal file:
 - `firmware/esp32s3/secrets.example.yaml`
 
 e crea la tua versione locale non pubblica con i valori reali.
+
+In particolare, il secret BLE da copiare nell'app si trova nel tuo file locale:
+
+- `firmware/esp32s3/secrets.yaml`
+
+con una voce di questo tipo:
+
+```yaml
+ble_shared_secret: "YOUR_REAL_SECRET"
+```
 
 ## Struttura repository
 

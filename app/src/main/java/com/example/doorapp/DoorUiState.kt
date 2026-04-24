@@ -25,6 +25,8 @@ data class DoorUiState(
   val visualUnlockedUntilMillis: Long = 0,
   val lastSeenRssi: Int? = null,
   val bleConnectable: Boolean? = null,
+  val bleSharedSecret: String = "",
+  val bleSharedSecretConfigured: Boolean = false,
   val biometricProtectionEnabled: Boolean = false,
   val biometricAvailable: Boolean = false,
 )

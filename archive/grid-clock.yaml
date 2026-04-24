@@ -1,0 +1,131 @@
+esphome:
+  name: grid-clock
+
+esp8266:
+  board: d1_mini_pro
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid_2
+  password: !secret wifi_password_2
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Grid-Clock Fallback Hotspot"
+    password: "v1vgouYJz8UP"
+
+captive_portal:
+
+web_server:
+  local: true
+
+substitutions:
+  xscrollpadding: "4" # in pix
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: ESP IP Address
+      icon: mdi:web
+    ssid:
+      name: ESP Connected SSID
+      icon: mdi:wifi
+    bssid:
+      name: ESP Connected BSSID
+      icon: mdi:wifi
+    mac_address:
+      name: ESP Mac Wifi Address
+      icon: mdi:chip
+  - platform: homeassistant
+    id: mytext
+    name: mytext
+    entity_id: input_text.grid_clock
+    internal: true 
+ 
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: wifi_sensor
+    icon: mdi:wifi
+    update_interval: 60s
+  - platform: uptime
+    name: Uptime Sensor
+    id: uptime_sensor
+    update_interval: 60s    
+  - platform: homeassistant
+    id: color_red
+    name: color_red
+    entity_id: input_number.grid_clock
+    internal: true     
+    on_value:
+      then:
+        - light.addressable_set:
+            id: grid_clock
+            red: !lambda "return x;"    
+  - platform: homeassistant
+    id: color_green
+    name: color_green
+    entity_id: input_number.grid_clock_green
+    internal: true     
+    on_value:
+      then:
+        - light.addressable_set:
+            id: grid_clock
+            red: !lambda "return x;"
+  - platform: homeassistant
+    id: color_blue
+    name: color_blue
+    entity_id: input_number.grid_clock_blue
+    internal: true     
+    on_value:
+      then:
+        - light.addressable_set:
+            id: grid_clock
+            red: !lambda "return x;"   
+
+light:
+  - platform: neopixelbus
+    variant: WS2812
+    pin: D4
+    num_leds: 162
+    type: GRB
+    name: "NeoPixel WS2812 Grid Clock"
+    icon: mdi:led-strip-variant
+    id: grid_clock
+
+font:
+  - file: "fonts/pixelart.ttf"
+    id: myfont
+    size: 7
+    
+display:
+  - platform: addressable_light
+    id: led_matrix_display
+    addressable_light_id: grid_clock
+    width: 27
+    height: 6
+    rotation: 0
+    pixel_mapper: |-
+      if (y % 2 == 0) {
+        return ((y+1) * 27) - x - 1;
+      } 
+      return ((y+1) * 27) - (26 - x) - 1;
+    update_interval: 100ms
+    lambda: |-
+          static uint16_t xpos = 0;
+          const char * text = id(mytext).state.c_str();
+     
+          int x_start, y_start;
+          int width, height;
+              
+          it.get_text_bounds(0, 0, text, id(myfont), TextAlign::TOP_LEFT, &x_start, &y_start, &width, &height); 
+          
+          it.print(round((27-width)/2), -1, id(myfont), Color(id(color_red).state, id(color_green).state, id(color_blue).state), TextAlign::TOP_LEFT, text); 

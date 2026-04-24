@@ -1,0 +1,152 @@
+substitutions:
+  devicename: led-strip-amon
+
+esphome:
+  name: ${devicename}
+  friendly_name: LED Amon
+
+esp8266:
+  board: d1_mini
+
+logger: null
+
+api: null
+
+wifi:
+  ssid: !secret wifi_ssid_2
+  password: !secret wifi_password_2
+  ap:
+    ssid: ${devicename} Fallback Hotspot
+    password: yK4Nia32K90Z
+
+ota:
+- platform: esphome
+  password: 94c15373a9cdc7aa0c4c3a976ef54b65
+
+captive_portal: null
+
+web_server:
+  local: true
+  version: 3
+
+binary_sensor:
+- platform: gpio
+  pin:
+    number: GPIO0
+    inverted: true
+    mode:
+      input: true
+      pullup: true
+  name: led_strip_amon_button_1
+  icon: mdi:gesture-tap-button
+  on_multi_click:
+  - timing:
+    - ON for at most 1s
+    - OFF for at least 0.5s
+    then:
+    - light.turn_on:
+        id: light1
+        brightness: 100%
+        color_mode: RGB
+        red: 100%
+        green: 90%
+        blue: 83%
+  - timing:
+    - ON for at most 1s
+    - OFF for at most 1s
+    - ON for at most 1s
+    - OFF for at least 0.2s
+    then:
+    - light.turn_on:
+        id: light1
+        brightness: 100%
+        effect: Rainbow
+  - timing:
+    - ON for 1s to 5s
+    - OFF for at least 0.5s
+    then:
+    - light.turn_off: light1
+- platform: gpio
+  pin:
+    number: GPIO5
+    mode:
+      input: true
+      pullup: false
+  name: led_strip_amon_button_2
+  icon: mdi:gesture-tap-button
+  on_multi_click:
+  - timing:
+    - ON for at most 1s
+    - OFF for at least 0.5s
+    then:
+    - light.turn_off: light1
+  - timing:
+    - ON for at most 1s
+    - OFF for at most 1s
+    - ON for at most 1s
+    - OFF for at least 0.2s
+    then:
+    - light.turn_off: light1
+  - timing:
+    - ON for 1s to 5s
+    - OFF for at least 0.5s
+    then:
+    - light.turn_off: light1
+
+switch:
+- platform: gpio
+  pin: GPIO12
+  name: led_strip_amon_switch_1
+  id: switch1
+
+light:
+- platform: neopixelbus
+  variant: WS2812
+  pin: D4
+  num_leds: 45
+  type: GRB
+  name: NeoPixel WS2812 Amon
+  id: light1
+  icon: mdi:led-strip-variant
+  effects:
+  - strobe: null
+  - flicker: null
+  - addressable_rainbow: null
+  - addressable_color_wipe: null
+  - addressable_scan: null
+  - addressable_twinkle: null
+  - addressable_random_twinkle: null
+  - addressable_fireworks: null
+  on_turn_on:
+  - switch.turn_on: switch1
+  on_turn_off:
+  - switch.turn_off: switch1
+
+text_sensor:
+- platform: wifi_info
+  ip_address:
+    name: ${devicename} IP address
+    icon: mdi:access-point-network
+  ssid:
+    name: ${devicename} SSID
+    icon: mdi:access-point-network
+  bssid:
+    name: ${devicename} BSSID
+    icon: mdi:access-point-network
+  mac_address:
+    name: ${devicename} MAC address
+    icon: mdi:chip
+
+sensor:
+- platform: wifi_signal
+  name: ${devicename} WiFi Signal
+  id: wifi_signal_db
+  entity_category: diagnostic
+  device_class: signal_strength
+  icon: mdi:wifi
+  update_interval: 60s
+- platform: uptime
+  name: ${devicename} Uptime
+  icon: mdi:clock
+  device_class: duration
+  update_interval: 60s

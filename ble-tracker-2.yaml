@@ -1,0 +1,97 @@
+substitutions:
+  friendly_name: BLE tracker 2
+  devicename: ble-tracker-2
+
+esphome:
+  name: ${devicename}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: lolin_d32
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+debug: null
+
+api:
+  encryption:
+    key: OHjuhrQkj25towWG46NtTk1Xbf0k5B+NGzUfqn4hQ7h=
+
+wifi:
+  ssid: !secret wifi_ssid_2
+  password: !secret wifi_password_2
+  ap:
+    ssid: ${devicename} Fallback Hotspot
+    password: yK4Nia32K90Z
+
+ota:
+- platform: esphome
+  password: b226988b7f381d8e92bfc08b827a6b9f
+
+captive_portal: null
+
+web_server:
+  version: 3
+
+status_led:
+  pin:
+    number: GPIO5
+    inverted: true
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+    interval: 211ms
+    window: 120ms
+
+bluetooth_proxy:
+  active: true
+text_sensor:
+- platform: wifi_info
+  ip_address:
+    name: ${devicename} IP address
+    id: esp_ip_address
+    icon: mdi:network
+    entity_category: diagnostic
+
+switch:
+- platform: restart
+  name: ${friendly_name} restart
+  device_class: switch
+  entity_category: diagnostic
+
+sensor:
+- platform: wifi_signal
+  name: ${devicename} WiFi Signal
+  id: wifi_signal_db
+  entity_category: diagnostic
+  device_class: signal_strength
+  icon: mdi:wifi
+  update_interval: 60s
+- platform: uptime
+  name: ${devicename} Uptime
+  icon: mdi:clock
+  device_class: duration
+  update_interval: 60s
+- platform: debug
+  free:
+    name: ${devicename} heap free
+    entity_category: diagnostic
+    device_class: data_size
+    icon: mdi:bug
+    id: energy_monitor_esp32s3_heap_free
+  block:
+    name: ${devicename} heap max block
+    entity_category: diagnostic
+    device_class: data_size
+    icon: mdi:bug
+    id: energy_monitor_esp32s3_heap_max_block
+  loop_time:
+    name: ${devicename} loop time
+    entity_category: diagnostic
+    device_class: duration
+    icon: mdi:bug
+    id: energy_monitor_esp32s3_loop_time

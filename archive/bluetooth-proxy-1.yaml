@@ -1,0 +1,72 @@
+esphome:
+  name: bluetooth-proxy-1
+  friendly_name: bluetooth proxy 1
+
+esp32:
+  board: lolin32_lite
+  framework:
+    type: arduino
+    # type: esp-idf    
+
+# Enable logging
+logger:
+  # baud_rate: 0  # disable serial uart logging
+  # level: VERBOSE
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "9ggjhvv11ZMkket4Gi4He8dcxHf9DIk0A3i9umd9oaQ="
+
+ota:
+  - platform: esphome
+    password: "c25d899783b1e8d5e67081b119e940f9"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Bluetooth-Proxy-1"
+    password: "TrXLl4kxHsy2"
+
+captive_portal:
+
+bluetooth_proxy:
+    active: True
+    
+esp32_ble_tracker:
+  scan_parameters:
+    active: True # Whether to send scan-request packets to devices to gather more info (like devicename)
+    interval: 320ms # suggested 211ms # default 320ms
+    window:   300ms # suggested 120ms # default 30ms
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP address
+      icon: mdi:access-point-network
+    ssid:
+      name: SSID
+      icon: mdi:access-point-network
+    bssid:
+      name: BSSID
+      icon: mdi:access-point-network
+    mac_address:
+      name: MAC address
+      icon: mdi:chip
+
+sensor:
+  - platform: wifi_signal
+    name: WiFi signal
+    id: wifi_signal_db
+    entity_category: "diagnostic"
+    device_class: signal_strength
+    icon: mdi:wifi
+    update_interval: 60s   
+  - platform: uptime
+    name: Uptime    
+    icon: mdi:clock
+    device_class: duration
+    update_interval: 60s   

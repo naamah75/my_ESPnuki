@@ -1,0 +1,521 @@
+substitutions:
+  friendly_name: Energy Monitor
+  devicename: energy-monitor-esp32s3
+
+esphome:
+  name: ${devicename}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: 600
+    then:
+      - light.turn_on:
+          id: status_led
+          brightness: 50%
+          red: 0%
+          green: 0%
+          blue: 100%
+      - lambda: |-
+          auto now = id(current_time).now();
+          if (now.is_valid()) {
+            char buffer[30];
+            auto tm = now.to_c_tm();
+            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+            id(startup_time).publish_state(buffer);
+          }
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 4MB
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: "W0fGcsbMxepluUVq8ABgHInsomw7a+DdsFSnLQsEmEc="
+  on_client_connected:
+    then:
+      - light.turn_on:
+          id: status_led
+          brightness: 50%
+          red: 0%
+          green: 100%
+          blue: 0%
+  on_client_disconnected:
+    then:
+      - light.turn_on:
+          id: status_led
+          brightness: 50%
+          red: 100%
+          green: 100%
+          blue: 0%
+
+ota:
+  - platform: esphome
+    password: "a77cb99a7b045f01e78e05e01e3a391e"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${devicename} Fb Hs"
+    password: "yK4Nia32K90Z"
+
+time:
+  - platform: sntp
+    id: current_time
+    timezone: Europe/Rome
+
+spi:
+  clk_pin: GPIO12
+  mosi_pin: GPIO11
+  miso_pin: GPIO13
+
+globals:
+  - id: show_logo
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+  - id: last_touch_time
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+  - id: current_page
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+color:
+  - id: my_white
+    red: 100%
+    green: 100%
+    blue: 100%
+    white: 100%
+
+  - id: my_green
+    red: 60%
+    green: 100%
+    blue: 0%
+    white: 0%
+
+  - id: my_red
+    red: 100%
+    green: 60%
+    blue: 0%
+    white: 0%
+
+  - id: my_blue
+    red: 60%
+    green: 60%
+    blue: 100%
+    white: 0%
+
+  - id: my_cyan
+    red: 39%
+    green: 58%
+    blue: 93%
+    white: 0%
+
+  - id: my_orange
+    red: 100%
+    green: 55%
+    blue: 0%
+    white: 0%
+
+  - id: my_grey
+    red: 40%
+    green: 40%
+    blue: 40%
+    white: 0%
+
+  - id: my_yellow
+    red: 100%
+    green: 84%
+    blue: 0%
+    white: 0%
+
+font:
+  - file: "fonts/LED Dot-Matrix.ttf"
+    id: number_extra
+    size: 92
+
+  - file: "fonts/LED Dot-Matrix.ttf"
+    id: number_regular
+    size: 48
+
+  - file: "fonts/digital-7 (mono).ttf"
+    id: title_regular
+    size: 22
+
+  - file: "fonts/digital-7 (mono).ttf"
+    id: title_small
+    size: 26
+
+  - file: "fonts/digital-7 (mono).ttf"
+    id: text_regular
+    size: 22
+
+image:
+  - file: "images/esphome-logo.jpg"
+    id: esphome_logo
+    type: GRAYSCALE
+    resize: 320x240
+
+  - file: "images/esphome-logo-background.jpg"
+    id: esphome_logo_background
+    type: GRAYSCALE
+    resize: 320x240
+
+light:
+  - platform: neopixelbus
+    variant: ws2812x
+    type: GRB
+    pin: GPIO47
+    num_leds: 1
+    id: status_led
+    restore_mode: ALWAYS_OFF
+
+touchscreen:
+  platform: xpt2046
+  id: touch_key0
+  cs_pin: GPIO18
+  update_interval: 100ms
+  calibration:
+    x_min: 0
+    x_max: 230
+    y_min: 0
+    y_max: 320
+  on_touch:
+    then:
+      - lambda: |-
+          id(last_touch_time) = millis();
+          id(current_page) += 1;
+          if (id(current_page) > 3) id(current_page) = 0;
+
+          if (id(current_page) == 0) {
+            id(my_display).show_page(id(page1));
+          } else if (id(current_page) == 1) {
+            id(my_display).show_page(id(page2));
+          } else if (id(current_page) == 2) {
+            id(my_display).show_page(id(page3));
+          } else if (id(current_page) == 3) {
+            id(my_display).show_page(id(page4));
+          }
+      - component.update: my_display
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${devicename} address"
+      id: esp_ip_address
+      icon: mdi:network
+      entity_category: diagnostic
+      on_value:
+        then:
+          - lambda: |-
+              id(show_logo) = false;
+    ssid:
+      name: "${devicename} SSID"
+      icon: mdi:wifi
+      entity_category: diagnostic
+    bssid:
+      name: "${devicename} BSSID"
+      icon: mdi:wifi
+      entity_category: diagnostic
+    mac_address:
+      name: "${devicename} MAC address"
+      icon: mdi:chip
+      entity_category: diagnostic
+
+  - platform: template
+    name: boot time
+    id: startup_time
+    icon: mdi:calendar-clock
+    entity_category: diagnostic
+    update_interval: never
+    lambda: |-
+      auto now = id(current_time).now();
+      if (!now.is_valid()) return std::string("");
+      char buffer[30];
+      auto tm = now.to_c_tm();
+      strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+      return std::string(buffer);
+
+  - platform: homeassistant
+    id: power_produced_peak_datetime
+    entity_id: sensor.picco_di_potenza_generata
+    attribute: datetime_of_occurrence
+    internal: true
+
+  - platform: homeassistant
+    id: power_consumed_peak_datetime
+    entity_id: sensor.picco_di_potenza_utilizzata
+    attribute: datetime_of_occurrence
+    internal: true
+
+  - platform: template
+    id: power_produced_peak_time
+    name: Orario picco produzione
+    icon: mdi:clock-time-four-outline
+    internal: true
+    update_interval: 30s
+    lambda: |-
+      if (id(power_produced_peak_datetime).has_state()) {
+        std::string dt = id(power_produced_peak_datetime).state;
+        if (dt.length() >= 16) {
+          return dt.substr(11, 5);
+        }
+      }
+      return std::string("");
+
+  - platform: template
+    id: power_consumed_peak_time
+    name: Orario picco consumo
+    icon: mdi:clock-time-four-outline
+    internal: true
+    update_interval: 30s
+    lambda: |-
+      if (id(power_consumed_peak_datetime).has_state()) {
+        std::string dt = id(power_consumed_peak_datetime).state;
+        if (dt.length() >= 16) {
+          return dt.substr(11, 5);
+        }
+      }
+      return std::string("");
+
+binary_sensor:
+  - platform: status
+    name: status
+    device_class: connectivity
+    entity_category: diagnostic
+
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        input: true
+        pullup: true
+    name: boot button
+    entity_category: diagnostic
+    filters:
+      - invert:
+    on_press:
+      - logger.log: "Pulsante P0 premuto!"
+
+switch:
+  - platform: restart
+    name: "${devicename} restart"
+    device_class: switch
+    entity_category: diagnostic
+
+sensor:
+  - platform: homeassistant
+    id: power_produced
+    entity_id: sensor.abb_inverter_ac_power_2
+    device_class: power
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    icon: mdi:solar-power
+
+  - platform: homeassistant
+    id: power_consumed
+    entity_id: sensor.template_sensor_shellyem_4417932202ed_channel_1_power_laststate
+    device_class: power
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    icon: mdi:power-plug
+
+  - platform: homeassistant
+    id: power_produced_peak
+    entity_id: sensor.picco_di_potenza_generata
+    device_class: power
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    internal: true
+
+  - platform: homeassistant
+    id: power_consumed_peak
+    entity_id: sensor.picco_di_potenza_utilizzata
+    device_class: power
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    internal: true
+
+  - platform: homeassistant
+    id: igrd
+    entity_id: sensor.abb_pout_2
+    attribute: IGRD
+    internal: true
+
+  - platform: homeassistant
+    id: vgrd
+    entity_id: sensor.abb_pout_2
+    attribute: VGRD
+    internal: true
+
+  - platform: homeassistant
+    id: atmp
+    entity_id: sensor.abb_pout_2
+    attribute: ATMP
+    internal: true
+
+  - platform: homeassistant
+    id: itmp
+    entity_id: sensor.abb_pout_2
+    attribute: ITMP
+    internal: true
+
+  - platform: homeassistant
+    id: grid_voltage
+    entity_id: sensor.shellyem_4417932202ed_channel_1_voltage
+    accuracy_decimals: 0
+    internal: true
+
+  - platform: wifi_signal
+    name: WiFi signal
+    id: energy_monitor_esp32s3_wifi_signal
+    update_interval: 60s
+    icon: mdi:wifi
+    device_class: signal_strength
+
+  - platform: uptime
+    name: "${devicename} Uptime"
+    icon: mdi:clock
+    device_class: duration
+
+graph:
+  - id: single_value_graph
+    duration: 30min
+    width: 320
+    height: 240
+    border: false
+    min_value: 0
+    max_value: 3300
+    y_grid: 500
+    x_grid: 10min
+    traces:
+      - sensor: power_consumed
+        line_type: SOLID
+        line_thickness: 2
+        color: my_orange
+        continuous: true
+
+      - sensor: power_produced
+        line_type: SOLID
+        line_thickness: 2
+        color: my_green
+        continuous: true
+
+display:
+  - platform: mipi_spi
+    id: my_display
+    model: ILI9341
+    cs_pin: GPIO4
+    dc_pin: GPIO10
+    rotation: 90
+    invert_colors: false
+    color_depth: 8
+    buffer_size: 25%
+    update_interval: 1s
+
+    pages:
+      - id: page1
+        lambda: |-
+          const int produced_x = 30;
+          const int consumed_x = 180;
+          const int title_balance_x = 30;
+          const int title_balance_y = 130;
+          const int value_y = 40;
+          const int title_y = 10;
+          const int value_balance_x = 70;
+          const int value_balance_y = 110;
+
+          it.image(0, 0, id(esphome_logo_background));
+
+          if (id(show_logo)) {
+            it.image(0, 0, id(esphome_logo_background));
+          } else {
+            it.print(produced_x, title_y, id(title_regular), "PRODUZIONE");
+            it.print(consumed_x, title_y, id(title_regular), "UTILIZZO");
+
+            float p_prod = id(power_produced).has_state() ? id(power_produced).state : 0.0f;
+            float prod_ratio = std::min(std::max(p_prod / 3300.0f, 0.0f), 1.0f);
+            uint8_t prod_r = id(my_grey).r + prod_ratio * (id(my_green).r - id(my_grey).r);
+            uint8_t prod_g = id(my_grey).g + prod_ratio * (id(my_green).g - id(my_grey).g);
+            uint8_t prod_b = id(my_grey).b + prod_ratio * (id(my_green).b - id(my_grey).b);
+            Color col_produced = Color(prod_r, prod_g, prod_b);
+
+            float p_cons = id(power_consumed).has_state() ? id(power_consumed).state : 0.0f;
+            float cons_ratio = std::min(std::max(p_cons / 3300.0f, 0.0f), 1.0f);
+            uint8_t cons_r = id(my_green).r + cons_ratio * (id(my_red).r - id(my_green).r);
+            uint8_t cons_g = id(my_green).g + cons_ratio * (id(my_red).g - id(my_green).g);
+            uint8_t cons_b = id(my_green).b + cons_ratio * (id(my_red).b - id(my_green).b);
+            Color col_consumed = Color(cons_r, cons_g, cons_b);
+
+            it.printf(produced_x, value_y, id(number_regular), col_produced, TextAlign::TOP_LEFT, "%04.0f", p_prod);
+            it.printf(consumed_x, value_y, id(number_regular), col_consumed, TextAlign::TOP_LEFT, "%04.0f", p_cons);
+
+            float bilancio = p_prod - p_cons;
+            float clamped = std::max(std::min(bilancio, 3300.0f), -4500.0f);
+            float ratio = (clamped + 4500.0f) / (3300.0f + 4500.0f);
+
+            uint8_t r = id(my_red).r + ratio * (id(my_green).r - id(my_red).r);
+            uint8_t g = id(my_red).g + ratio * (id(my_green).g - id(my_red).g);
+            uint8_t b = id(my_red).b + ratio * (id(my_green).b - id(my_red).b);
+            Color bilancio_color = Color(r, g, b);
+
+            const char* segno = bilancio >= 0 ? "+" : "-";
+            Color segno_color = bilancio >= 0 ? id(my_green) : id(my_red);
+
+            it.printf(value_balance_x, value_balance_y, id(number_extra), bilancio_color, TextAlign::LEFT, "%04.0f", abs((int) bilancio));
+            it.print(title_balance_x, title_balance_y, id(number_regular), segno_color, TextAlign::LEFT, segno);
+          }
+
+      - id: page2
+        lambda: |-
+          it.image(0, 0, id(esphome_logo_background));
+          it.graph(0, 0, id(single_value_graph));
+          it.printf(5, 5, id(title_regular), my_green, "PROD. %.0f W", id(power_produced).has_state() ? id(power_produced).state : 0.0f);
+          it.printf(5, 215, id(title_regular), my_orange, "UTIL. %.0f W", id(power_consumed).has_state() ? id(power_consumed).state : 0.0f);
+
+      - id: page3
+        lambda: |-
+          it.image(0, 0, id(esphome_logo_background));
+          it.print(10, 10, id(title_small), my_white, "Informazioni avanzate");
+
+          it.printf(10, 120, id(text_regular), my_yellow, "Tensione di rete: %.0f V", id(grid_voltage).has_state() ? id(grid_voltage).state : 0.0f);
+          it.printf(10, 140, id(text_regular), my_cyan, "Temperatura inverter: %.0f C", id(itmp).has_state() ? id(itmp).state : 0.0f);
+          it.printf(10, 160, id(text_regular), my_cyan, "Corrente inverter: %.0f A", id(igrd).has_state() ? id(igrd).state : 0.0f);
+          it.printf(10, 180, id(text_regular), my_cyan, "Tensione inverter: %.0f V", id(vgrd).has_state() ? id(vgrd).state : 0.0f);
+          it.printf(10, 200, id(text_regular), my_green, "Picco prod.: %.0f W (%s)",
+                    id(power_produced_peak).has_state() ? id(power_produced_peak).state : 0.0f,
+                    id(power_produced_peak_time).state.c_str());
+          it.printf(10, 220, id(text_regular), my_orange, "Picco util.: %.0f W (%s)",
+                    id(power_consumed_peak).has_state() ? id(power_consumed_peak).state : 0.0f,
+                    id(power_consumed_peak_time).state.c_str());
+
+      - id: page4
+        lambda: |-
+          it.image(0, 0, id(esphome_logo_background));
+          it.print(10, 10, id(title_small), my_white, "Informazioni di sistema");
+
+          it.printf(10, 100, id(text_regular), my_cyan, "IP: %s", id(esp_ip_address).state.c_str());
+          it.printf(10, 120, id(text_regular), my_cyan, "WiFi RSSI: %.0f dBm",
+                    id(energy_monitor_esp32s3_wifi_signal).has_state() ? id(energy_monitor_esp32s3_wifi_signal).state : 0.0f);
+          it.printf(10, 140, id(text_regular), my_green, "Avvio: %s", id(startup_time).state.c_str());
+
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          if ((id(current_page) == 2 || id(current_page) == 3) &&
+              (millis() - id(last_touch_time) > 60000)) {
+            id(current_page) = 0;
+            id(my_display).show_page(id(page1));
+            id(my_display).update();
+          }

@@ -1,0 +1,92 @@
+esphome:
+  name: ble-tracker
+  friendly_name: ble tracker
+
+esp32:
+  board: lolin_d32
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "cPmQgomGuaMazsw3USgpyE+jcRGwpA4gsLt6akxoVyE="
+
+ota:
+  - platform: esphome
+    password: "53824147e40e619eb81e73bf7907bdda"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  on_connect:
+    - esp32_ble_tracker.start_scan:
+        continuous: false
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Ble-Tracker Fallback Hotspot"
+    password: "CUy5Fd5nyTK5"
+
+captive_portal:
+
+web_server:
+  local: True
+  version: 3
+
+esp32_ble_tracker:
+  scan_parameters:
+    continuous: false
+  on_ble_advertise:
+    - mac_address:
+        - 38:8A:06:66:1B:FF
+        - A6:D7:3C:0C:BC:43
+      then:
+        - lambda: |-
+            ESP_LOGD("ble_adv", "New BLE device");
+            ESP_LOGD("ble_adv", "  address: %s", x.address_str().c_str());
+            ESP_LOGD("ble_adv", "  name: %s", x.get_name().c_str());
+            ESP_LOGD("ble_adv", "  Advertised service UUIDs:");
+            for (auto uuid : x.get_service_uuids()) {
+                ESP_LOGD("ble_adv", "    - %s", uuid.to_string().c_str());
+            }
+            ESP_LOGD("ble_adv", "  Advertised service data:");
+            for (auto data : x.get_service_datas()) {
+                ESP_LOGD("ble_adv", "    - %s: (length %i)", data.uuid.to_string().c_str(), data.data.size());
+            }
+            ESP_LOGD("ble_adv", "  Advertised manufacturer data:");
+            for (auto data : x.get_manufacturer_datas()) {
+                ESP_LOGD("ble_adv", "    - %s: (length %i)", data.uuid.to_string().c_str(), data.data.size());
+            }  
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP address
+      icon: mdi:access-point-network
+    ssid:
+      name: SSID
+      icon: mdi:access-point-network
+    bssid:
+      name: BSSID
+      icon: mdi:access-point-network
+    mac_address:
+      name: MAC address
+      icon: mdi:chip
+
+sensor:
+  - platform: wifi_signal
+    name: WiFi signal
+    id: wifi_signal_db
+    entity_category: "diagnostic"
+    device_class: signal_strength
+    icon: mdi:wifi
+    update_interval: 60s   
+  - platform: uptime
+    name: Uptime    
+    icon: mdi:clock
+    device_class: duration
+    update_interval: 60s   

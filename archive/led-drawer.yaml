@@ -1,0 +1,85 @@
+substitutions:
+  devicename: led-drawer
+  leds: '30'
+
+esphome:
+  name: ${devicename}
+  friendly_name: LED scrivania
+
+esp8266:
+  board: d1_mini
+  restore_from_flash: true
+
+logger:
+
+api:
+  encryption:
+    key: "FrwhN4IBRT1HBbzS2efA4infvNoyjmks96YfOip7rXY="
+
+wifi:
+  ssid: !secret wifi_ssid_2
+  password: !secret wifi_password_2
+  ap:
+    ssid: ${devicename} Fallback Hotspot
+    password: yK4Nia32K90Z
+
+ota:
+  - platform: esphome
+    password: "451f499f26acd83a528869448cc925a2"
+
+captive_portal:
+
+web_server:
+  local: true
+  version: 3
+
+light:
+  - platform: neopixelbus
+    restore_mode: RESTORE_DEFAULT_OFF
+    variant: WS2812
+    pin: D1
+    num_leds: ${leds}
+    type: GRB
+    name: NeoPixel WS2812
+    id: light1
+    icon: mdi:led-strip-variant
+    effects:
+      - strobe:
+      - flicker:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+      - addressable_scan:
+      - addressable_twinkle:
+      - addressable_random_twinkle:
+      - addressable_fireworks:
+
+text_sensor:
+- platform: wifi_info
+  ip_address:
+    name: ${devicename} IP address
+    icon: mdi:wifi
+    entity_category: diagnostic
+  ssid:
+    name: ${devicename} SSID
+    icon: mdi:wifi
+    entity_category: diagnostic
+  bssid:
+    name: ${devicename} BSSID
+    icon: mdi:wifi
+    entity_category: diagnostic
+  mac_address:
+    name: ${devicename} MAC address
+    icon: mdi:chip
+    entity_category: diagnostic
+
+sensor:
+- platform: wifi_signal
+  name: ${devicename} WiFi Signal
+  id: wifi_signal_db
+  entity_category: diagnostic
+  device_class: signal_strength
+  icon: mdi:wifi
+- platform: uptime
+  name: ${devicename} Uptime
+  icon: mdi:clock
+  device_class: duration

@@ -1,0 +1,96 @@
+esphome:
+  name: wio_link
+  platform: ESP8266
+  board: wio_link
+
+wifi:
+  ssid: !secret wifi_ssid_2
+  password: !secret wifi_password_2
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Wio Link Fallback Hotspot"
+    password: "84ew1BLmUD5K"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+web_server:
+  local: true
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: ESP IP Address
+      icon: mdi:wifi
+    ssid:
+      name: ESP Connected SSID
+      icon: mdi:wifi
+    bssid:
+      name: ESP Connected BSSID
+      icon: mdi:wifi
+    mac_address:
+      name: ESP Mac Wifi Address
+      icon: mdi:chip
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    icon: mdi:wifi
+    update_interval: 60s
+  - platform: dht
+    model: DHT22
+    pin: GPIO12
+    temperature:
+      name: "Wio Link 1 temperatura"
+    humidity:
+      name: "Wio Link 1 umdidità"
+    update_interval: 60s
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO4
+      inverted: false
+      mode: INPUT        
+    name: "Wio Link 1 pir A"
+    id: pir1
+    device_class: motion
+  - platform: gpio
+    pin:
+      number: GPIO5
+      inverted: false
+      mode: INPUT        
+    name: "Wio Link 1 pir B"
+    id: pir2
+    device_class: motion    
+    
+switch:   
+  - platform: gpio
+    pin:
+      number: GPIO13
+      inverted: false
+      mode: OUTPUT        
+    name: "Wio Link 1 relay"
+    id: relay
+  - platform: gpio
+    pin:
+      number: GPIO14
+      inverted: true
+      mode: OUTPUT        
+    name: "Wio Link 1 switch"
+    id: switch_1
+  - platform: gpio
+    pin:
+      number: GPIO15
+      inverted: true
+      mode: OUTPUT        
+    name: "Wio Link 1 led"
+    id: red_led

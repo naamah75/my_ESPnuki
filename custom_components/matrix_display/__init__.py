@@ -1,0 +1,1 @@
+# required for ESPHome to detect the component

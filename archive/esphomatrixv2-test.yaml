@@ -1,0 +1,94 @@
+substitutions:
+  devicename: ehmtx8266
+  matrix_pin: GPIO02
+
+esphome:
+  name: $devicename
+  friendly_name: LED Matrix
+  comment: 8x8 RGB EspHoMaTriX TEST
+
+external_components:
+  - source: github://lubeda/EspHoMaTriXv2
+    refresh: 60s 
+    components: [ ehmtxv2 ]   
+  
+# external_components:
+#   - source:
+#       # type: local
+#       # path: /config/esphome/components
+#       type: git
+#       url: https://github.com/lubeda/EspHoMaTriXv2
+#       ref: 2025.2.1
+#     refresh: 60s 
+#     components: [ ehmtxv2 ]   
+
+esp8266:
+  board: d1_mini_pro
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "mex2hV6RlEB9qrNy2uoqUxDo4tNX4RsPDU/rlaxnKEs="
+
+ota:
+  - platform: esphome
+    password: "14bacb38cc729f32a4f935339f906c31"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esphomatrixv2-Test"
+    password: "DOnWqo6JPJ5V"
+
+captive_portal:
+
+light:
+  - platform: neopixelbus
+    variant: WS2812
+    type: GRB
+    pin: GPIO4  
+    num_leds: 64
+    id: matrix_light
+
+font:
+  - file: "fonts/minecraftia.ttf"
+    id: matrix_font
+    size: 8
+
+time:
+  - platform: homeassistant
+    id: matrix_time
+
+display:
+  - platform: addressable_light
+    id: matrix_display
+    addressable_light_id: matrix_light
+    width: 8
+    height: 8
+    pixel_mapper: |-
+      if (y % 2 == 0) {
+        return (y * 8) + x;
+      }
+      return (y * 8) + (7 - x);
+    lambda: |-
+      it.fill(COLOR_OFF);
+      it.print(0, 0, id(matrix_font), COLOR_ON, "A");
+
+# ehmtxv2:
+#   id: rgb8x32
+#   icons2html: true
+#   matrix_component: matrix_display
+#   time_component: matrix_time
+#   time_format: "%H:%M"
+#   date_format: "%d.%m."
+#   default_font_id: matrix_font
+#   special_font_id: matrix_font 
+#   icons: 
+#     - id: error
+#       lameid: 40530  

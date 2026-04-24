@@ -1,0 +1,429 @@
+esphome:
+  name: energy-monitor-esp8266
+  friendly_name: energy_monitor_esp8266
+
+esp8266:
+  board: d1_mini_pro
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: "iaOBdBVXYUFZG0+35SpztAJ8P7BbuGTpWXYEx8/n9G0="
+
+ota:
+  - platform: esphome
+    password: "cd8bd089f763c76cc1d25bc64f1c2d26"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Energy-Monitor-Esp8266"
+    password: "YzLTmP5iRtOh"
+
+captive_portal:
+
+# web_server:
+#   local: true
+#   version: 3
+
+status_led:
+  pin:
+    number: GPIO02
+    inverted: true
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+color:
+  - id: my_white
+    red: 100%
+    green: 100%
+    blue: 100%
+    white: 100%
+  - id: my_green
+    red: 60%
+    green: 100%
+    blue: 0%
+    white: 0%
+  - id: my_red
+    red: 100%
+    green: 60%
+    blue: 0%
+    white: 0%
+  - id: my_blue
+    red: 60%
+    green: 60%
+    blue: 100%
+    white: 0%    
+  - id: my_orange
+    red: 100%
+    green: 100%
+    blue: 0%
+    white: 0%    
+  - id: my_grey
+    red: 40%
+    green: 40%
+    blue: 40%
+    white: 0%    
+    
+image:
+  - file: "./images/weather-sunny_48.png"
+    type: GRAYSCALE
+    id: weather_sunnny
+  - file: "./images/weather-sunny-off_48.png"
+    type: GRAYSCALE
+    id: weather_sunnny_off
+  - file: "./images/transmission-tower-import_48.png"
+    type: GRAYSCALE
+    id: tower_import
+  - file: "./images/transmission-tower-export_48.png"
+    type: GRAYSCALE
+    id: tower_export
+  - file: "./images/transmission-tower-off_48.png"
+    type: GRAYSCALE
+    id: tower_off
+  - file: "./images/solar-power_36.png"
+    type: GRAYSCALE
+    id: solar_power
+  - file: "./images/sun-energy_64.png"
+    type: GRAYSCALE
+    id: sun_energy
+    resize: 48x48
+  - file: "./images/power-plug-48.png"
+    type: GRAYSCALE
+    id: power_plug
+  - file: "./images/dishwasher.png"
+    id: dishwasher
+    type: GRAYSCALE
+  - file: "./images/dishwasher-gray.png"
+    id: dishwasher_gray
+    type: GRAYSCALE
+  - file: "./images/microwave.png"
+    id: microwave
+    type: GRAYSCALE
+  - file: "./images/microwave-gray.png"
+    id: microwave_gray
+    type: GRAYSCALE
+  - file: "./images/toaster-oven.png"
+    id: toaster_oven
+    type: GRAYSCALE
+  - file: "./images/toaster-oven-gray.png"
+    id: toaster_oven_gray
+    type: GRAYSCALE
+  - file: "./images/washing-machine.png"
+    id: washing_machine
+    type: GRAYSCALE
+  - file: "./images/washing-machine-gray.png"
+    id: washing_machine_gray
+    type: GRAYSCALE
+  - file: "./images/tumble-dryer.png"
+    id: dryer
+    type: GRAYSCALE
+  - file: "./images/tumble-dryer-gray.png"
+    id: dryer_gray           
+    type: GRAYSCALE    
+
+font:
+  - file: "./fonts/Calculator.ttf"
+    id: my_font
+    size: 128
+  - file: "./fonts/Calculator.ttf"
+    id: my_font_regular
+    size: 96       
+  - file: "./fonts/Calculator.ttf"
+    id: my_font_small
+    size: 64    
+  - file: "./fonts/Calculator.ttf"
+    id: my_font_tiny
+    size: 32       
+  - file: "./fonts/Calculator.ttf"
+    id: my_extra_font_tiny
+    size: 18           
+
+text_sensor:
+  - platform: homeassistant
+    id: abb_status 
+    entity_id: sensor.t_abb_status    
+  - platform: wifi_info
+    ip_address:
+      name: "ESP8266 IP address"
+      id: esp_ip_address
+      icon: mdi:network 
+      entity_category: diagnostic
+    # scan_results:
+    #   name: "ESP8266 Latest Scan Results"
+    #   id: esp_ip_scan_results
+    #   icon: mdi:lan 
+    #   entity_category: diagnostic
+    ssid:
+      name: "ESP8266 SSID"
+      id: esp_ip_ssid
+      icon: mdi:wifi
+      entity_category: diagnostic
+    bssid:
+      name: "ESP8266 BSSID"
+      id: esp_ip_bssid
+      icon: mdi:router-network-wireless
+      entity_category: diagnostic             
+
+binary_sensor:
+  - platform: homeassistant
+    id: asciugatrice 
+    entity_id: binary_sensor.asciugatrice 
+    on_press:
+      then:
+        - display.page.show: page4
+        - component.update: my_display
+  - platform: homeassistant
+    id: lavatrice 
+    entity_id: binary_sensor.lavatrice
+    on_press:
+      then:
+        - display.page.show: page4
+        - component.update: my_display    
+  - platform: homeassistant
+    id: microonde 
+    entity_id: binary_sensor.microonde
+    on_press:
+      then:
+        - display.page.show: page4
+        - component.update: my_display    
+  - platform: homeassistant
+    id: forno 
+    entity_id: binary_sensor.forno
+    on_press:
+      then:
+        - display.page.show: page4
+        - component.update: my_display    
+  - platform: homeassistant
+    id: lavastoviglie 
+    entity_id: binary_sensor.lavastoviglie
+    on_press:
+      then:
+        - display.page.show: page4
+        - component.update: my_display    
+
+sensor:
+  - platform: homeassistant
+    id: abb_pout 
+    entity_id: sensor.abb_inverter_ac_power_zero
+  - platform: homeassistant
+    id: solar_power_nett_zero 
+    entity_id: sensor.solar_power_nett_zero_2
+  - platform: homeassistant
+    id: grid_power_nett_zero
+    entity_id: sensor.grid_power_nett_zero  
+  - platform: homeassistant
+    id: energy_available
+    entity_id: sensor.energy_available        
+  - platform: wifi_signal
+    name: "ESP8266 segnale WiFi"
+    update_interval: 60s
+    icon: mdi:wifi
+    device_class: signal_strength
+  - platform: uptime
+    name: "ESP8266 tempo di lavoro"
+    id: esp_uptime  
+    update_interval: 60s
+    icon: mdi:timer-outline
+    device_class: duration    
+
+interval:
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            or:
+             - binary_sensor.is_on: asciugatrice
+             - binary_sensor.is_on: lavatrice
+             - binary_sensor.is_on: microonde
+             - binary_sensor.is_on: forno
+             - binary_sensor.is_on: lavastoviglie
+          then:    
+            - display.page.show: page4
+            - component.update: my_display     
+      - if:
+          condition:
+            and:
+             - binary_sensor.is_off: asciugatrice
+             - binary_sensor.is_off: lavatrice
+             - binary_sensor.is_off: microonde
+             - binary_sensor.is_off: forno
+             - binary_sensor.is_off: lavastoviglie
+          then:    
+            - display.page.show_next: my_display
+            - component.update: my_display   
+      - if:
+          condition:
+            and:
+             - binary_sensor.is_off: asciugatrice
+             - binary_sensor.is_off: lavatrice
+             - binary_sensor.is_off: microonde
+             - binary_sensor.is_off: forno
+             - binary_sensor.is_off: lavastoviglie
+             - display.is_displaying_page: page4
+          then:          
+            - display.page.show_next: my_display
+            - component.update: my_display   
+            
+graph:
+  - id: single_value_graph
+    duration: 10min
+    width: 280
+    height: 240
+    border: false
+    max_value: 3000
+    min_value: 0
+    traces:
+      - sensor: abb_pout
+        line_type: SOLID
+        line_thickness: 3
+        color: my_orange
+      - sensor: solar_power_nett_zero
+        line_type: SOLID
+        line_thickness: 3
+        color: my_red
+      - sensor: grid_power_nett_zero
+        line_type: SOLID
+        line_thickness: 3
+        color: my_green
+
+display:
+  - platform: ili9xxx
+    model: TFT 2.4
+    cs_pin: GPIO16
+    dc_pin: GPIO15
+    id: my_display
+    rotation: 90
+    invert_colors: false
+    pages:
+      - id: page1
+        lambda: |-
+              if (id(abb_pout).state < 1) {
+                it.printf(60, 96, id(my_font), my_grey, TextAlign::TOP_LEFT, "%04.0f", id(abb_pout).state);
+              } else  {
+                if (id(abb_pout).state > 450) {
+                  it.printf(60, 96, id(my_font), my_green, TextAlign::TOP_LEFT, "%04.0f", id(abb_pout).state);
+                } else {
+                  it.printf(60, 96, id(my_font), my_orange, TextAlign::TOP_LEFT, "%04.0f", id(abb_pout).state);
+                }
+              }
+              it.print(296, 156, id(my_font_small), TextAlign::TOP_LEFT, "w");
+              it.print(72, 14, id(my_font_tiny), "ENER. PRODOTTA");
+              it.filled_rectangle(0, 66, 320, 2, my_orange);
+              if (id(abb_pout).state > 0) {
+                it.image(6, 6, id(weather_sunnny));
+              } else {
+                it.image(6, 6, id(weather_sunnny_off));
+              }
+      - id: page2
+        lambda: |-
+              if (id(solar_power_nett_zero).state < 1) {
+                it.printf(60, 96, id(my_font), my_grey, TextAlign::TOP_LEFT, "%04.0f", id(solar_power_nett_zero).state);
+              } else {
+                if (id(solar_power_nett_zero).state > 900) {
+                  it.printf(60, 96, id(my_font), my_orange, TextAlign::TOP_LEFT, "%04.0f", id(solar_power_nett_zero).state);
+                } else {
+                  if (id(solar_power_nett_zero).state > 1800) {
+                    it.printf(60, 96, id(my_font), my_red, TextAlign::TOP_LEFT, "%04.0f", id(solar_power_nett_zero).state);
+                  } else {
+                    it.printf(60, 96, id(my_font), my_green, TextAlign::TOP_LEFT, "%04.0f", id(solar_power_nett_zero).state);
+                  }
+                }
+              }
+              it.print(296, 156, id(my_font_small), TextAlign::TOP_LEFT, "w");
+              it.print(72, 14, id(my_font_tiny), "ENER. ACQUISTATA");
+              it.filled_rectangle(0, 66, 320, 2, my_red);
+              it.image(2, 6, id(tower_import));
+      - id: page3
+        lambda: |-
+              if (id(grid_power_nett_zero).state < 1) {
+                it.printf(60, 96, id(my_font), my_grey, TextAlign::TOP_LEFT, "%04.0f", id(grid_power_nett_zero).state);
+              } else {
+                if (id(grid_power_nett_zero).state > 450) {
+                  it.printf(60, 96, id(my_font), my_green, TextAlign::TOP_LEFT, "%04.0f", id(grid_power_nett_zero).state);
+                } else {
+                  it.printf(60, 96, id(my_font), my_orange, TextAlign::TOP_LEFT, "%04.0f", id(grid_power_nett_zero).state);
+                }
+              }
+              it.print(296, 156, id(my_font_small), TextAlign::TOP_LEFT, "w");
+              it.print(72, 14, id(my_font_tiny), "ENER. RIVENDUTA");
+              it.filled_rectangle(0, 64, 320, 4, my_green);
+              it.image(12, 6, id(tower_export));
+      - id: page4
+        lambda: |-
+              if (id(energy_available).state > 3000) {
+                it.printf(80, 128, id(my_font_regular), my_green, TextAlign::TOP_LEFT, "%04.0f", id(energy_available).state);
+              } else {
+                if (id(energy_available).state > 1500) {
+                  it.printf(80, 128, id(my_font_regular), my_orange, TextAlign::TOP_LEFT, "%04.0f", id(energy_available).state);
+                } else {
+                  it.printf(80, 128, id(my_font_regular), my_red, TextAlign::TOP_LEFT, "%04.0f", id(energy_available).state);
+                }
+              }
+              if (id(asciugatrice).state) {
+                it.image(10, 80, id(dryer));   
+              } else {
+                it.image(10, 80, id(dryer_gray));
+              }
+              if (id(lavatrice).state) {
+                it.image(70, 80, id(washing_machine));   
+              } else {
+                it.image(70, 80, id(washing_machine_gray));
+              }
+              if (id(microonde).state) {
+                it.image(130, 80, id(microwave));   
+              } else {
+                it.image(130, 80, id(microwave_gray));
+              }
+              if (id(forno).state) {
+                it.image(190, 80, id(toaster_oven));   
+              } else {
+                it.image(190, 80, id(toaster_oven_gray));
+              }
+              if (id(lavastoviglie).state) {
+                it.image(250, 80, id(dishwasher));   
+              } else {
+                it.image(250, 80, id(dishwasher_gray));
+              }
+              it.print(260, 156, id(my_font_small), TextAlign::TOP_LEFT, "w");
+              it.print(72, 14, id(my_font_tiny), "ENER. DISPONIBILE");
+              it.filled_rectangle(0, 64, 320, 4, my_green);
+              it.image(12, 6, id(power_plug));                    
+      # - id: page5
+      #   lambda: |-
+      #         it.graph(10, 10, id(single_value_graph));
+      #         it.print(72, 14, id(my_font_tiny), "FOTOVOLTAICO");
+      #         if (id(abb_pout).state > 0) {
+      #           it.image(6, 6, id(weather_sunnny));
+      #         } else {
+      #           it.image(6, 6, id(weather_sunnny_off));
+      #         }              
+
+touchscreen:
+  platform: xpt2046
+  cs_pin: GPIO0
+  update_interval: 100ms
+  id: touch_key0
+  calibration: 
+    x_min: 80
+    x_max: 230
+    y_min: 0
+    y_max: 320
+  on_touch:
+    # - lambda: 'ESP_LOGI("main", "key0: %s", (x ? "touch" : "release"));'
+    # - lambda: |-
+    #       ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+    #           id(touchscreen).x,
+    #           id(touchscreen).y,
+    #           id(touchscreen).x_raw,
+    #           id(touchscreen).y_raw
+    #           );    
+    - display.page.show_next: my_display
+    - component.update: my_display      
+      

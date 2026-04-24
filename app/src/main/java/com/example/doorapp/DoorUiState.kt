@@ -8,6 +8,7 @@ data class PeripheralField(
 enum class AppScreen {
   HOME,
   ACTIONS,
+  SETTINGS,
   INFO,
 }
 
@@ -24,4 +25,6 @@ data class DoorUiState(
   val visualUnlockedUntilMillis: Long = 0,
   val lastSeenRssi: Int? = null,
   val bleConnectable: Boolean? = null,
+  val biometricProtectionEnabled: Boolean = false,
+  val biometricAvailable: Boolean = false,
 )

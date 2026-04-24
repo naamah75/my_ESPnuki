@@ -1,9 +1,18 @@
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Properties
 
 val buildTimestamp = ZonedDateTime.now(ZoneId.systemDefault())
   .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z"))
+val localProperties = Properties().apply {
+  val file = rootProject.file("local.properties")
+  if (file.exists()) {
+    file.inputStream().use { load(it) }
+  }
+}
+val bleSharedSecret = (localProperties.getProperty("bleSharedSecret") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
+val repositoryUrl = "https://github.com/naamah75/my_ESPnuki"
 
 plugins {
   id("com.android.application")
@@ -22,6 +31,8 @@ android {
     versionCode = 1
     versionName = "0.1.0"
     buildConfigField("String", "BUILD_TIMESTAMP", "\"$buildTimestamp\"")
+    buildConfigField("String", "BLE_SHARED_SECRET", "\"$bleSharedSecret\"")
+    buildConfigField("String", "REPOSITORY_URL", "\"$repositoryUrl\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -61,10 +72,12 @@ dependencies {
   val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
 
   implementation("androidx.core:core-ktx:1.13.1")
+  implementation("androidx.appcompat:appcompat:1.7.0")
   implementation("androidx.activity:activity-compose:1.9.0")
   implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
   implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
   implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
+  implementation("androidx.biometric:biometric:1.1.0")
   implementation(composeBom)
   implementation("androidx.compose.ui:ui")
   implementation("androidx.compose.ui:ui-tooling-preview")

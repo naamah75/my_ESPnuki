@@ -4,7 +4,8 @@ import java.util.UUID
 
 object BleDoorConfig {
   const val deviceName = "ibeacon-detector-test"
-  const val sharedSecret = "door-test-secret-2026"
+  val sharedSecret: String
+    get() = BuildConfig.BLE_SHARED_SECRET
 
   val serviceUuid: UUID = UUID.fromString("19b10000-e8f2-537e-4f6c-d104768a1214")
   val challengeUuid: UUID = UUID.fromString("19b10001-e8f2-537e-4f6c-d104768a1214")

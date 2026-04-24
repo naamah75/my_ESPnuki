@@ -73,6 +73,10 @@ class BleDoorController(private val context: Context) {
       onLog(message)
     }
 
+    if (BleDoorConfig.sharedSecret.isBlank()) {
+      return Result.Failure("Configura bleSharedSecret in local.properties prima di usare lo sblocco", lines.joinToString("\n"))
+    }
+
     if (!BlePermissions.hasAll(context)) {
       return Result.Failure("Concedi i permessi Bluetooth all'app", lines.joinToString("\n"))
     }

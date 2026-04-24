@@ -6,11 +6,13 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
@@ -23,8 +25,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,8 +45,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberDrawerState
@@ -63,6 +69,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -73,11 +83,17 @@ private val AccentYellow = Color(0xFFF3C544)
 private val SoftText = Color(0xFFB7B7B7)
 private val RingColor = Color(0xFFF5F2EB)
 private val RingTrack = Color(0x33F5F2EB)
+private val CardBackground = Color(0xFF171717)
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+    WindowInsetsControllerCompat(window, window.decorView).apply {
+      hide(WindowInsetsCompat.Type.navigationBars())
+      systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
 
     setContent {
       MaterialTheme {
@@ -98,6 +114,7 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
   val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
     missingPermissions = BlePermissions.missing(context)
   }
+  val activity = context as FragmentActivity
   val drawerState = rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
   val sheetState = rememberBottomSheetScaffoldState()
   val scope = rememberCoroutineScope()
@@ -115,6 +132,14 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
       launcher.launch(missing)
     } else {
       action()
+    }
+  }
+
+  fun withAppSecurity(action: () -> Unit) {
+    if (!uiState.biometricProtectionEnabled) {
+      action()
+    } else {
+      authenticateWithDevice(activity, action)
     }
   }
 
@@ -158,6 +183,8 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
           .fillMaxSize()
           .background(AppBackground)
           .padding(innerPadding)
+          .statusBarsPadding()
+          .navigationBarsPadding()
           .padding(horizontal = 24.dp, vertical = 16.dp),
       ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -166,14 +193,19 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
           when (uiState.currentScreen) {
             AppScreen.HOME -> HomeScreen(
               uiState = uiState,
-              onOpenDoor = { withPermissions { viewModel.openDoor() } },
+              onOpenDoor = { withPermissions { withAppSecurity { viewModel.openDoor() } } },
             )
 
             AppScreen.ACTIONS -> ActionsScreen(
               uiState = uiState,
               onRefresh = { withPermissions { viewModel.refreshPeripheralData() } },
-              onSetAutoOpen = { enabled -> withPermissions { viewModel.setAutoOpen(enabled) } },
-              onRestart = { withPermissions { viewModel.restartDevice() } },
+              onSetAutoOpen = { enabled -> withPermissions { withAppSecurity { viewModel.setAutoOpen(enabled) } } },
+              onRestart = { withPermissions { withAppSecurity { viewModel.restartDevice() } } },
+            )
+
+            AppScreen.SETTINGS -> SettingsScreen(
+              uiState = uiState,
+              onSetBiometricProtection = { enabled -> viewModel.setBiometricProtection(enabled) },
             )
 
             AppScreen.INFO -> InfoScreen(uiState = uiState)
@@ -207,11 +239,7 @@ private fun HeaderRow(onOpenMenu: () -> Unit) {
       )
       Text(text = "secondary BLE access", color = SoftText, style = MaterialTheme.typography.labelSmall)
     }
-    Box(
-      modifier = Modifier
-        .size(10.dp)
-        .background(AccentYellow, CircleShape),
-    )
+    Spacer(modifier = Modifier.size(10.dp))
   }
 }
 
@@ -235,6 +263,7 @@ private fun DrawerContent(
     Spacer(modifier = Modifier.height(24.dp))
     DrawerItem("Home", currentScreen == AppScreen.HOME) { onNavigate(AppScreen.HOME) }
     DrawerItem("Azioni", currentScreen == AppScreen.ACTIONS) { onNavigate(AppScreen.ACTIONS) }
+    DrawerItem("Impostazioni", currentScreen == AppScreen.SETTINGS) { onNavigate(AppScreen.SETTINGS) }
     DrawerItem("Info", currentScreen == AppScreen.INFO) { onNavigate(AppScreen.INFO) }
     Spacer(modifier = Modifier.height(24.dp))
     Text(
@@ -269,17 +298,21 @@ private fun DrawerItem(title: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun HomeScreen(uiState: DoorUiState, onOpenDoor: () -> Unit) {
   val relayActive = peripheralValue(uiState.peripheralFields, "Relay attivo") == "On"
-  val isUnlocked = relayActive
-  val centerLabel = if (isUnlocked) "sbloccato" else "bloccato"
+  val centerLabel = when {
+    relayActive -> "sbloccato"
+    uiState.status == "connessione in corso" -> "sbloccato"
+    uiState.status == "sblocco in corso" -> "sbloccato"
+    else -> "bloccato"
+  }
 
   Column(
     modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center,
   ) {
-    Spacer(modifier = Modifier.height(28.dp))
     Box(
       modifier = Modifier
-        .size(320.dp)
+        .size(272.dp)
         .clickable(enabled = !uiState.isBusy, onClick = onOpenDoor),
       contentAlignment = Alignment.Center,
     ) {
@@ -287,24 +320,20 @@ private fun HomeScreen(uiState: DoorUiState, onOpenDoor: () -> Unit) {
         val stroke = Stroke(width = 22.dp.toPx(), cap = StrokeCap.Round)
         drawArc(
           color = RingTrack,
-          startAngle = 140f,
+          startAngle = 320f,
           sweepAngle = 260f,
           useCenter = false,
           style = stroke,
         )
         drawArc(
           color = RingColor,
-          startAngle = 140f,
+          startAngle = 320f,
           sweepAngle = 260f,
           useCenter = false,
           style = stroke,
         )
       }
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (uiState.isBusy) {
-          CircularProgressIndicator(color = AccentYellow)
-          Spacer(modifier = Modifier.height(16.dp))
-        }
         Text(
           text = centerLabel,
           color = Color.White,
@@ -331,7 +360,7 @@ private fun ActionsScreen(
     verticalArrangement = Arrangement.spacedBy(16.dp),
   ) {
     Text(text = "Azioni", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-    Text(text = "Canale di controllo secondario via BLE", color = SoftText)
+    Text(text = "Controlli locali in stile Nuki via BLE", color = SoftText)
     ActionCard(title = "Automazione apertura") {
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -339,19 +368,58 @@ private fun ActionsScreen(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Column(modifier = Modifier.weight(1f)) {
-          Text(text = if (autoOpenEnabled) "Abilitata" else "Disabilitata", color = Color.White)
+          Text(text = if (autoOpenEnabled) "Abilitata" else "Disabilitata", color = AccentYellow, style = MaterialTheme.typography.titleMedium)
           Text(text = "Attiva o disattiva l'automazione dal dispositivo", color = SoftText)
         }
-        Switch(checked = autoOpenEnabled, onCheckedChange = { onSetAutoOpen(it) }, enabled = !uiState.isBusy)
+        Switch(
+          checked = autoOpenEnabled,
+          onCheckedChange = { onSetAutoOpen(it) },
+          enabled = !uiState.isBusy,
+          colors = nukiSwitchColors(),
+        )
       }
     }
     ActionCard(title = "Periferica") {
-      Button(onClick = onRefresh, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Aggiorna dati BLE")
+      OutlinedButton(onClick = onRefresh, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
+        Text("Aggiorna dati BLE", color = AccentYellow)
       }
       Spacer(modifier = Modifier.height(12.dp))
-      Button(onClick = onRestart, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Riavvia ESP32")
+      OutlinedButton(onClick = onRestart, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
+        Text("Riavvia ESP32", color = AccentYellow)
+      }
+    }
+  }
+}
+
+@Composable
+private fun SettingsScreen(uiState: DoorUiState, onSetBiometricProtection: (Boolean) -> Unit) {
+  Column(
+    modifier = Modifier
+      .fillMaxSize()
+      .verticalScroll(rememberScrollState()),
+    verticalArrangement = Arrangement.spacedBy(16.dp),
+  ) {
+    Text(text = "Impostazioni", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text(text = "Sicurezza e comportamento dell'app", color = SoftText)
+    ActionCard(title = "Sicurezza") {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(text = "Impronta o PIN", color = AccentYellow, style = MaterialTheme.typography.titleMedium)
+          Text(
+            text = if (uiState.biometricAvailable) "Richiedi l'autenticazione Android per sblocco e azioni sensibili" else "Autenticazione biometrica o PIN non disponibile su questo dispositivo",
+            color = SoftText,
+          )
+        }
+        Switch(
+          checked = uiState.biometricProtectionEnabled,
+          onCheckedChange = onSetBiometricProtection,
+          enabled = uiState.biometricAvailable,
+          colors = nukiSwitchColors(),
+        )
       }
     }
   }
@@ -362,10 +430,11 @@ private fun ActionCard(title: String, content: @Composable () -> Unit) {
   Column(
     modifier = Modifier
       .fillMaxWidth()
-      .background(SheetBackground, RoundedCornerShape(24.dp))
+      .background(CardBackground, RoundedCornerShape(24.dp))
+      .border(1.dp, AccentYellow.copy(alpha = 0.18f), RoundedCornerShape(24.dp))
       .padding(20.dp),
   ) {
-    Text(text = title, color = Color.White, style = MaterialTheme.typography.titleLarge)
+    Text(text = title, color = AccentYellow, style = MaterialTheme.typography.titleLarge)
     Spacer(modifier = Modifier.height(16.dp))
     content()
   }
@@ -383,7 +452,7 @@ private fun InfoScreen(uiState: DoorUiState) {
     InfoRow("Versione", BuildConfig.VERSION_NAME)
     InfoRow("Build", BuildConfig.BUILD_TIMESTAMP)
     InfoRow("Device BLE", BleDoorConfig.deviceName)
-    InfoRow("Repository GitHub", "da definire")
+    InfoRow("Repository GitHub", BuildConfig.REPOSITORY_URL)
     if (uiState.log.isNotEmpty()) {
       Spacer(modifier = Modifier.height(8.dp))
       Text(text = "Ultimo log", color = Color.White, style = MaterialTheme.typography.titleMedium)
@@ -411,13 +480,13 @@ private fun DiagnosticsSheet(
   uiState: DoorUiState,
 ) {
   val subtitle = statusSubtitle(uiState)
-  val controlFields = uiState.peripheralFields.filter { it.label in setOf("Automazione apertura", "Relay Lock", "Relay attivo", "WiFi connesso") }
   val networkFields = uiState.peripheralFields.filter { it.label in setOf("IP address", "SSID", "BSSID", "MAC address", "WiFi Signal") }
   val systemFields = uiState.peripheralFields.filter { it.label in setOf("Boot time", "Uptime", "CPU temperature") }
   Column(
     modifier = Modifier
       .fillMaxWidth()
       .height(420.dp)
+      .navigationBarsPadding()
       .padding(horizontal = 20.dp),
   ) {
     Row(
@@ -433,10 +502,6 @@ private fun DiagnosticsSheet(
     }
     Spacer(modifier = Modifier.height(16.dp))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-      if (controlFields.isNotEmpty()) {
-        item { SheetSectionTitle("Controllo") }
-        items(controlFields) { field -> PeripheralFieldRow(field) }
-      }
       if (networkFields.isNotEmpty()) {
         item { SheetSectionTitle("Rete") }
         items(networkFields) { field -> PeripheralFieldRow(field) }
@@ -490,27 +555,58 @@ private fun peripheralValue(fields: List<PeripheralField>, label: String): Strin
 }
 
 private fun statusSubtitle(uiState: DoorUiState): String {
-  if (uiState.isBusy) return "connessione in corso"
+  if (uiState.status == "connessione in corso") return "connessione in corso"
+  if (uiState.status == "sblocco in corso") return "sblocco in corso"
+  if (uiState.status == "blocco in corso") return "blocco in corso"
 
   val rssi = uiState.lastSeenRssi
-  val connectable = uiState.bleConnectable
   if (rssi == null) return uiState.status
 
-  val proximity = when {
-    rssi >= -65 -> "molto vicina"
-    rssi >= -78 -> "in zona"
-    else -> "piu' distante"
-  }
-
-  return if (connectable == false) {
-    "periferica $proximity ma non connettibile"
-  } else {
-    "periferica $proximity e connettibile"
+  return when {
+    rssi >= -60 -> "periferica a portata"
+    rssi >= -72 -> "periferica vicina"
+    rssi >= -84 -> "periferica debole"
+    else -> "periferica fuori zona"
   }
 }
+
+@Composable
+private fun nukiSwitchColors() = SwitchDefaults.colors(
+  checkedThumbColor = AppBackground,
+  checkedTrackColor = AccentYellow,
+  checkedBorderColor = AccentYellow,
+  uncheckedThumbColor = Color.White,
+  uncheckedTrackColor = Color.White.copy(alpha = 0.18f),
+  uncheckedBorderColor = Color.White.copy(alpha = 0.18f),
+)
 
 private fun copyLogToClipboard(context: Context, text: String) {
   val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
   clipboard.setPrimaryClip(ClipData.newPlainText("Door App BLE Log", text))
   Toast.makeText(context, "Log copiato", Toast.LENGTH_SHORT).show()
+}
+
+private fun authenticateWithDevice(context: FragmentActivity, onSuccess: () -> Unit) {
+  val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+  if (BiometricManager.from(context).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+    onSuccess()
+    return
+  }
+
+  val executor = ContextCompat.getMainExecutor(context)
+  val prompt = BiometricPrompt(
+    context,
+    executor,
+    object : BiometricPrompt.AuthenticationCallback() {
+      override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+        onSuccess()
+      }
+    },
+  )
+  val promptInfo = BiometricPrompt.PromptInfo.Builder()
+    .setTitle("Conferma azione")
+    .setSubtitle("Usa impronta o PIN per continuare")
+    .setAllowedAuthenticators(authenticators)
+    .build()
+  prompt.authenticate(promptInfo)
 }

@@ -1,6 +1,8 @@
 package com.example.doorapp
 
 import android.app.Application
+import android.content.Context
+import androidx.biometric.BiometricManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
@@ -11,12 +13,23 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
   private val controller = BleDoorController(application.applicationContext)
+  private val prefs = application.getSharedPreferences("door_app", Context.MODE_PRIVATE)
 
-  private val _uiState = MutableStateFlow(DoorUiState())
+  private val _uiState = MutableStateFlow(
+    DoorUiState(
+      biometricProtectionEnabled = prefs.getBoolean("biometric_protection", false),
+      biometricAvailable = isBiometricAvailable(application.applicationContext),
+    ),
+  )
   val uiState: StateFlow<DoorUiState> = _uiState.asStateFlow()
 
   fun navigateTo(screen: AppScreen) {
     _uiState.value = _uiState.value.copy(currentScreen = screen)
+  }
+
+  fun setBiometricProtection(enabled: Boolean) {
+    prefs.edit().putBoolean("biometric_protection", enabled).apply()
+    _uiState.value = _uiState.value.copy(biometricProtectionEnabled = enabled)
   }
 
   fun openDoor() {
@@ -25,7 +38,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch {
       _uiState.value = _uiState.value.copy(
         isBusy = true,
-        status = "Connessione BLE in corso...",
+        status = "connessione in corso",
         challenge = "",
         debug = "",
         lastResponse = "",
@@ -35,9 +48,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
       )
       when (val result = controller.openDoor { line -> appendLog(line) }) {
         is BleDoorController.Result.Success -> {
-          _uiState.value = DoorUiState(
+          _uiState.value = _uiState.value.copy(
             isBusy = false,
-            status = result.status,
+            status = "sblocco in corso",
             challenge = result.challenge,
             debug = result.debug,
             lastResponse = result.response,
@@ -95,14 +108,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch {
       _uiState.value = _uiState.value.copy(
         isBusy = true,
-        status = "Lettura dati periferica in corso...",
+        status = "connessione in corso",
         log = "[start] lettura dati periferica richiesta",
       )
       when (val result = controller.readSnapshot { line -> appendLog(line) }) {
         is BleDoorController.SnapshotResult.Success -> {
           _uiState.value = _uiState.value.copy(
             isBusy = false,
-            status = "Dati periferica aggiornati",
+            status = "idle",
             peripheralFields = result.fields,
             log = result.log,
             lastSeenRssi = result.discovery.rssi,
@@ -184,20 +197,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
   }
 
   private suspend fun monitorRelayPulse() {
+    var sawUnlocked = false
     repeat(7) {
       delay(350)
       when (val result = controller.readSnapshot { }) {
         is BleDoorController.SnapshotResult.Success -> {
+          val relayActive = result.fields.firstOrNull { it.label == "Relay attivo" }?.value == "On"
           _uiState.value = _uiState.value.copy(
             peripheralFields = result.fields,
             lastSeenRssi = result.discovery.rssi,
             bleConnectable = result.discovery.connectable,
+            status = when {
+              relayActive -> {
+                sawUnlocked = true
+                "sblocco in corso"
+              }
+
+              sawUnlocked -> "blocco in corso"
+              else -> _uiState.value.status
+            },
           )
+          if (sawUnlocked && !relayActive) {
+            delay(900)
+            _uiState.value = _uiState.value.copy(status = "idle")
+            return
+          }
         }
 
         is BleDoorController.SnapshotResult.Failure -> return
       }
     }
+    _uiState.value = _uiState.value.copy(status = "idle")
   }
 
   private fun appendLog(line: String) {
@@ -205,4 +235,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
       log = if (_uiState.value.log.isBlank()) line else _uiState.value.log + "\n" + line,
     )
   }
+}
+
+private fun isBiometricAvailable(context: Context): Boolean {
+  val manager = BiometricManager.from(context)
+  val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+  return manager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
 }

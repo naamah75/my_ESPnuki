@@ -3,6 +3,7 @@
 
 # Keep the ignore rules themselves tracked.
 !/.gitignore
+!/README.md
 
 # Keep only the door controller configs/docs in this repo.
 !/ibeacon-detector*.*

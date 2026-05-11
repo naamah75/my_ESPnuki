@@ -22,6 +22,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
       bleSharedSecretConfigured = BleDoorConfig.hasSharedSecret(application.applicationContext),
       biometricProtectionEnabled = prefs.getBoolean("biometric_protection", false),
       biometricAvailable = isBiometricAvailable(application.applicationContext),
+      languageCode = prefs.getString("language_code", "") ?: "",
     ),
   )
   val uiState: StateFlow<DoorUiState> = _uiState.asStateFlow()
@@ -33,6 +34,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
   fun setBiometricProtection(enabled: Boolean) {
     prefs.edit().putBoolean("biometric_protection", enabled).apply()
     _uiState.value = _uiState.value.copy(biometricProtectionEnabled = enabled)
+  }
+
+  fun setLanguageCode(languageCode: String) {
+    prefs.edit().putString("language_code", languageCode).apply()
+    _uiState.value = _uiState.value.copy(languageCode = languageCode)
   }
 
   fun setBleSharedSecret(value: String) {
@@ -75,7 +81,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         is BleDoorController.Result.Failure -> {
-          _uiState.value = _uiState.value.copy(isBusy = false, status = result.message, log = result.log)
+          _uiState.value = _uiState.value.copy(
+            isBusy = false,
+            status = result.message,
+            log = result.log,
+            lastSeenRssi = null,
+            bleConnectable = null,
+          )
         }
       }
     }
@@ -140,6 +152,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isBusy = false,
             status = result.message,
             log = result.log,
+            lastSeenRssi = null,
+            bleConnectable = null,
           )
         }
       }
@@ -170,7 +184,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         is BleDoorController.CommandResult.Failure -> {
-          _uiState.value = _uiState.value.copy(isBusy = false, status = result.message, log = result.log)
+          _uiState.value = _uiState.value.copy(
+            isBusy = false,
+            status = result.message,
+            log = result.log,
+            lastSeenRssi = null,
+            bleConnectable = null,
+          )
         }
       }
     }
@@ -197,7 +217,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         is BleDoorController.CommandResult.Failure -> {
-          _uiState.value = _uiState.value.copy(isBusy = false, status = result.message, log = result.log)
+          _uiState.value = _uiState.value.copy(
+            isBusy = false,
+            status = result.message,
+            log = result.log,
+            lastSeenRssi = null,
+            bleConnectable = null,
+          )
         }
       }
     }

@@ -9,6 +9,7 @@ enum class AppScreen {
   HOME,
   ACTIONS,
   SETTINGS,
+  ADVANCED,
   INFO,
 }
 
@@ -29,4 +30,5 @@ data class DoorUiState(
   val bleSharedSecretConfigured: Boolean = false,
   val biometricProtectionEnabled: Boolean = false,
   val biometricAvailable: Boolean = false,
+  val languageCode: String = "",
 )

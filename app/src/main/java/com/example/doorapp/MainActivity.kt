@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.os.LocaleList
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -60,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -89,8 +91,12 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 private val AppBackground = Color(0xFF050505)
 private val SheetBackground = Color(0xFF1A1A1A)
@@ -99,8 +105,16 @@ private val SoftText = Color(0xFFB7B7B7)
 private val RingColor = Color(0xFFF5F2EB)
 private val RingTrack = Color(0x33F5F2EB)
 private val CardBackground = Color(0xFF171717)
+private val DisabledRing = Color(0xFF5F5F5F)
+private val DisabledRingTrack = Color(0x335F5F5F)
+private const val PreferencesName = "door_app"
+private const val LanguageCodeKey = "language_code"
 
 class MainActivity : FragmentActivity() {
+  override fun attachBaseContext(newBase: Context) {
+    super.attachBaseContext(localizedContext(newBase, getSavedLanguageCode(newBase)))
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -125,7 +139,10 @@ class MainActivity : FragmentActivity() {
 private fun DoorApp(viewModel: MainViewModel = viewModel()) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current
+  val lifecycleOwner = LocalLifecycleOwner.current
   var missingPermissions by remember { mutableStateOf(BlePermissions.missing(context)) }
+  var appUnlocked by rememberSaveable { mutableStateOf(false) }
+  var authInProgress by rememberSaveable { mutableStateOf(false) }
   val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
     missingPermissions = BlePermissions.missing(context)
   }
@@ -134,10 +151,61 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
   val sheetState = rememberBottomSheetScaffoldState()
   val scope = rememberCoroutineScope()
 
-  LaunchedEffect(Unit) {
-    if (BlePermissions.missing(context).isEmpty()) {
+  val appLockEnabled = uiState.biometricProtectionEnabled && uiState.biometricAvailable
+
+  fun requestAppUnlock() {
+    if (!appLockEnabled || appUnlocked || authInProgress) return
+
+    authInProgress = true
+    authenticateWithDevice(
+      context = activity,
+      onSuccess = {
+        appUnlocked = true
+        authInProgress = false
+      },
+      onDismiss = { authInProgress = false },
+    )
+  }
+
+  DisposableEffect(lifecycleOwner, appLockEnabled) {
+    val observer = LifecycleEventObserver { _, event ->
+      when (event) {
+        Lifecycle.Event.ON_START -> {
+          if (appLockEnabled) {
+            appUnlocked = false
+            requestAppUnlock()
+          } else {
+            appUnlocked = true
+          }
+        }
+
+        Lifecycle.Event.ON_STOP -> {
+          if (appLockEnabled) appUnlocked = false
+        }
+
+        else -> Unit
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
+
+  LaunchedEffect(appLockEnabled) {
+    if (appLockEnabled) requestAppUnlock() else appUnlocked = true
+  }
+
+  LaunchedEffect(appUnlocked, appLockEnabled) {
+    if ((!appLockEnabled || appUnlocked) && BlePermissions.missing(context).isEmpty()) {
       viewModel.refreshPeripheralData()
     }
+  }
+
+  if (appLockEnabled && !appUnlocked) {
+    LockedAppScreen(
+      authInProgress = authInProgress,
+      onUnlock = { requestAppUnlock() },
+    )
+    return
   }
 
   fun withPermissions(action: () -> Unit) {
@@ -150,37 +218,16 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
     }
   }
 
-  fun withAppSecurity(action: () -> Unit) {
-    if (!uiState.biometricProtectionEnabled) {
-      action()
-    } else {
-      authenticateWithDevice(activity, action)
-    }
-  }
-
   ModalNavigationDrawer(
     drawerState = drawerState,
     drawerContent = {
-      DrawerContent(
-        currentScreen = uiState.currentScreen,
-        hasLog = uiState.log.isNotEmpty(),
-        onNavigate = { screen ->
-          viewModel.navigateTo(screen)
-          scope.launch { drawerState.close() }
-        },
-        onRefresh = {
-          withPermissions { viewModel.refreshPeripheralData() }
-          scope.launch { drawerState.close() }
-        },
-        onScan = {
-          withPermissions { viewModel.scanBle() }
-          scope.launch { drawerState.close() }
-        },
-        onCopyLog = {
-          copyLogToClipboard(context, uiState.log)
-          scope.launch { drawerState.close() }
-        },
-      )
+        DrawerContent(
+          currentScreen = uiState.currentScreen,
+          onNavigate = { screen ->
+            viewModel.navigateTo(screen)
+            scope.launch { drawerState.close() }
+          },
+        )
     },
   ) {
     BottomSheetScaffold(
@@ -208,26 +255,70 @@ private fun DoorApp(viewModel: MainViewModel = viewModel()) {
           when (uiState.currentScreen) {
             AppScreen.HOME -> HomeScreen(
               uiState = uiState,
-              onOpenDoor = { withPermissions { withAppSecurity { viewModel.openDoor() } } },
+              onOpenDoor = { withPermissions { viewModel.openDoor() } },
             )
 
             AppScreen.ACTIONS -> ActionsScreen(
               uiState = uiState,
               onRefresh = { withPermissions { viewModel.refreshPeripheralData() } },
-              onSetAutoOpen = { enabled -> withPermissions { withAppSecurity { viewModel.setAutoOpen(enabled) } } },
-              onRestart = { withPermissions { withAppSecurity { viewModel.restartDevice() } } },
+              onSetAutoOpen = { enabled -> withPermissions { viewModel.setAutoOpen(enabled) } },
+              onRestart = { withPermissions { viewModel.restartDevice() } },
             )
 
             AppScreen.SETTINGS -> SettingsScreen(
               uiState = uiState,
               onSetBiometricProtection = { enabled -> viewModel.setBiometricProtection(enabled) },
               onSaveBleSharedSecret = { secret -> viewModel.setBleSharedSecret(secret) },
+              onSetLanguageCode = { languageCode ->
+                viewModel.setLanguageCode(languageCode)
+                activity.recreate()
+              },
+            )
+
+            AppScreen.ADVANCED -> AdvancedScreen(
+              uiState = uiState,
+              onRefresh = { withPermissions { viewModel.refreshPeripheralData() } },
+              onScan = { withPermissions { viewModel.scanBle() } },
+              onCopyLog = { copyLogToClipboard(context, uiState.log) },
             )
 
             AppScreen.INFO -> InfoScreen(uiState = uiState)
           }
         }
       }
+    }
+  }
+}
+
+@Composable
+private fun LockedAppScreen(authInProgress: Boolean, onUnlock: () -> Unit) {
+  Column(
+    modifier = Modifier
+      .fillMaxSize()
+      .background(AppBackground)
+      .statusBarsPadding()
+      .navigationBarsPadding()
+      .padding(24.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center,
+  ) {
+    Text(
+      text = "ESPnuki",
+      color = Color.White,
+      style = MaterialTheme.typography.headlineLarge,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(text = stringResource(R.string.app_locked), color = AccentYellow, style = MaterialTheme.typography.titleLarge)
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(text = stringResource(R.string.app_locked_description), color = SoftText, textAlign = TextAlign.Center)
+    Spacer(modifier = Modifier.height(24.dp))
+    Button(
+      onClick = onUnlock,
+      enabled = !authInProgress,
+      colors = ButtonDefaults.buttonColors(containerColor = AccentYellow, contentColor = AppBackground),
+    ) {
+      Text(if (authInProgress) stringResource(R.string.authenticating) else stringResource(R.string.unlock_app))
     }
   }
 }
@@ -262,11 +353,7 @@ private fun HeaderRow(onOpenMenu: () -> Unit) {
 @Composable
 private fun DrawerContent(
   currentScreen: AppScreen,
-  hasLog: Boolean,
   onNavigate: (AppScreen) -> Unit,
-  onRefresh: () -> Unit,
-  onScan: () -> Unit,
-  onCopyLog: () -> Unit,
 ) {
   ModalDrawerSheet(drawerContainerColor = SheetBackground, drawerContentColor = Color.White) {
     Spacer(modifier = Modifier.height(24.dp))
@@ -280,19 +367,8 @@ private fun DrawerContent(
     DrawerItem(stringResource(R.string.nav_home), currentScreen == AppScreen.HOME) { onNavigate(AppScreen.HOME) }
     DrawerItem(stringResource(R.string.nav_actions), currentScreen == AppScreen.ACTIONS) { onNavigate(AppScreen.ACTIONS) }
     DrawerItem(stringResource(R.string.nav_settings), currentScreen == AppScreen.SETTINGS) { onNavigate(AppScreen.SETTINGS) }
+    DrawerItem(stringResource(R.string.nav_advanced), currentScreen == AppScreen.ADVANCED) { onNavigate(AppScreen.ADVANCED) }
     DrawerItem(stringResource(R.string.nav_info), currentScreen == AppScreen.INFO) { onNavigate(AppScreen.INFO) }
-    Spacer(modifier = Modifier.height(24.dp))
-    Text(
-      text = stringResource(R.string.quick_actions),
-      color = SoftText,
-      style = MaterialTheme.typography.labelLarge,
-      modifier = Modifier.padding(horizontal = 24.dp),
-    )
-    DrawerItem(stringResource(R.string.refresh_ble_data), false, onRefresh)
-    DrawerItem(stringResource(R.string.ble_scan), false, onScan)
-    if (hasLog) {
-      DrawerItem(stringResource(R.string.copy_log), false, onCopyLog)
-    }
   }
 }
 
@@ -313,13 +389,18 @@ private fun DrawerItem(title: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun HomeScreen(uiState: DoorUiState, onOpenDoor: () -> Unit) {
+  val deviceDetected = uiState.lastSeenRssi != null
   val relayActive = peripheralValue(uiState.peripheralFields, "Relay attivo") == "On"
   val centerLabel = when {
+    !deviceDetected -> stringResource(R.string.no_device)
     relayActive -> stringResource(R.string.status_unlocked)
     uiState.status == "connessione in corso" -> stringResource(R.string.status_unlocked)
     uiState.status == "sblocco in corso" -> stringResource(R.string.status_unlocked)
     else -> stringResource(R.string.status_locked)
   }
+  val ringColor = if (deviceDetected) RingColor else DisabledRing
+  val ringTrack = if (deviceDetected) RingTrack else DisabledRingTrack
+  val labelColor = if (deviceDetected) Color.White else DisabledRing
 
   Column(
     modifier = Modifier.fillMaxSize(),
@@ -329,20 +410,20 @@ private fun HomeScreen(uiState: DoorUiState, onOpenDoor: () -> Unit) {
     Box(
       modifier = Modifier
         .size(272.dp)
-        .clickable(enabled = !uiState.isBusy, onClick = onOpenDoor),
+        .clickable(enabled = deviceDetected && !uiState.isBusy, onClick = onOpenDoor),
       contentAlignment = Alignment.Center,
     ) {
       Canvas(modifier = Modifier.fillMaxSize()) {
         val stroke = Stroke(width = 22.dp.toPx(), cap = StrokeCap.Round)
         drawArc(
-          color = RingTrack,
+          color = ringTrack,
           startAngle = 320f,
           sweepAngle = 260f,
           useCenter = false,
           style = stroke,
         )
         drawArc(
-          color = RingColor,
+          color = ringColor,
           startAngle = 320f,
           sweepAngle = 260f,
           useCenter = false,
@@ -352,8 +433,9 @@ private fun HomeScreen(uiState: DoorUiState, onOpenDoor: () -> Unit) {
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
           text = centerLabel,
-          color = Color.White,
+          color = labelColor,
           style = MaterialTheme.typography.headlineLarge,
+          textAlign = TextAlign.Center,
         )
       }
     }
@@ -408,10 +490,42 @@ private fun ActionsScreen(
 }
 
 @Composable
+private fun AdvancedScreen(
+  uiState: DoorUiState,
+  onRefresh: () -> Unit,
+  onScan: () -> Unit,
+  onCopyLog: () -> Unit,
+) {
+  Column(
+    modifier = Modifier
+      .fillMaxSize()
+      .verticalScroll(rememberScrollState()),
+    verticalArrangement = Arrangement.spacedBy(16.dp),
+  ) {
+    Text(text = stringResource(R.string.nav_advanced), color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text(text = stringResource(R.string.advanced_subtitle), color = SoftText)
+    ActionCard(title = stringResource(R.string.advanced_ble_tools)) {
+      OutlinedButton(onClick = onRefresh, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.refresh_ble_data), color = AccentYellow)
+      }
+      Spacer(modifier = Modifier.height(12.dp))
+      OutlinedButton(onClick = onScan, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.ble_scan), color = AccentYellow)
+      }
+      Spacer(modifier = Modifier.height(12.dp))
+      OutlinedButton(onClick = onCopyLog, enabled = uiState.log.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.copy_log), color = AccentYellow)
+      }
+    }
+  }
+}
+
+@Composable
 private fun SettingsScreen(
   uiState: DoorUiState,
   onSetBiometricProtection: (Boolean) -> Unit,
   onSaveBleSharedSecret: (String) -> Unit,
+  onSetLanguageCode: (String) -> Unit,
 ) {
   var secretInput by rememberSaveable(uiState.bleSharedSecret) { mutableStateOf(uiState.bleSharedSecret) }
 
@@ -423,6 +537,27 @@ private fun SettingsScreen(
   ) {
     Text(text = stringResource(R.string.nav_settings), color = Color.White, style = MaterialTheme.typography.headlineMedium)
     Text(text = stringResource(R.string.settings_subtitle), color = SoftText)
+    ActionCard(title = stringResource(R.string.language)) {
+      Text(text = stringResource(R.string.language_description), color = SoftText)
+      Spacer(modifier = Modifier.height(12.dp))
+      LanguageOption(
+        label = stringResource(R.string.language_system),
+        selected = uiState.languageCode.isBlank(),
+        onClick = { onSetLanguageCode("") },
+      )
+      Spacer(modifier = Modifier.height(8.dp))
+      LanguageOption(
+        label = stringResource(R.string.language_english),
+        selected = uiState.languageCode == "en",
+        onClick = { onSetLanguageCode("en") },
+      )
+      Spacer(modifier = Modifier.height(8.dp))
+      LanguageOption(
+        label = stringResource(R.string.language_italian),
+        selected = uiState.languageCode == "it",
+        onClick = { onSetLanguageCode("it") },
+      )
+    }
     ActionCard(title = stringResource(R.string.ble_access)) {
       Text(
         text = if (uiState.bleSharedSecretConfigured) stringResource(R.string.ble_shared_key) else stringResource(R.string.ble_secret_hint),
@@ -501,6 +636,19 @@ private fun SettingsScreen(
         )
       }
     }
+  }
+}
+
+@Composable
+private fun LanguageOption(label: String, selected: Boolean, onClick: () -> Unit) {
+  val colors = if (selected) {
+    ButtonDefaults.buttonColors(containerColor = AccentYellow, contentColor = AppBackground)
+  } else {
+    ButtonDefaults.outlinedButtonColors(contentColor = AccentYellow)
+  }
+
+  OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = colors) {
+    Text(label)
   }
 }
 
@@ -758,7 +906,24 @@ private fun copyLogToClipboard(context: Context, text: String) {
   Toast.makeText(context, context.getString(R.string.log_copied), Toast.LENGTH_SHORT).show()
 }
 
-private fun authenticateWithDevice(context: FragmentActivity, onSuccess: () -> Unit) {
+private fun getSavedLanguageCode(context: Context): String {
+  return context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+    .getString(LanguageCodeKey, "") ?: ""
+}
+
+private fun localizedContext(context: Context, languageCode: String): Context {
+  if (languageCode.isBlank()) return context
+
+  val locale = Locale.forLanguageTag(languageCode)
+  Locale.setDefault(locale)
+
+  val config = android.content.res.Configuration(context.resources.configuration)
+  config.setLocale(locale)
+  config.setLocales(LocaleList(locale))
+  return context.createConfigurationContext(config)
+}
+
+private fun authenticateWithDevice(context: FragmentActivity, onSuccess: () -> Unit, onDismiss: () -> Unit = {}) {
   val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
   if (BiometricManager.from(context).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
     onSuccess()
@@ -772,6 +937,14 @@ private fun authenticateWithDevice(context: FragmentActivity, onSuccess: () -> U
     object : BiometricPrompt.AuthenticationCallback() {
       override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
         onSuccess()
+      }
+
+      override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+        onDismiss()
+      }
+
+      override fun onAuthenticationFailed() {
+        onDismiss()
       }
     },
   )

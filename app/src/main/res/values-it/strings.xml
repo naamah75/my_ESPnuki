@@ -5,11 +5,13 @@
   <string name="nav_home">Home</string>
   <string name="nav_actions">Azioni</string>
   <string name="nav_settings">Impostazioni</string>
+  <string name="nav_advanced">Avanzate</string>
   <string name="nav_info">Info</string>
   <string name="quick_actions">Azioni rapide</string>
   <string name="refresh_ble_data">Aggiorna dati BLE</string>
   <string name="ble_scan">Scansione BLE</string>
   <string name="copy_log">Copia log</string>
+  <string name="no_device">no BLE</string>
   <string name="status_unlocked">sbloccato</string>
   <string name="status_locked">bloccato</string>
   <string name="actions_subtitle">Controlli locali in stile Nuki via BLE</string>
@@ -19,7 +21,14 @@
   <string name="auto_open_description">Attiva o disattiva l\'automazione dal dispositivo</string>
   <string name="peripheral">Periferica</string>
   <string name="restart_esp32">Riavvia ESP32</string>
+  <string name="advanced_subtitle">Azioni diagnostiche e strumenti BLE</string>
+  <string name="advanced_ble_tools">Strumenti BLE</string>
   <string name="settings_subtitle">Sicurezza e comportamento dell\'app</string>
+  <string name="language">Lingua</string>
+  <string name="language_description">Scegli la lingua dell\'app o usa quella di sistema Android.</string>
+  <string name="language_system">Lingua di sistema</string>
+  <string name="language_english">Inglese</string>
+  <string name="language_italian">Italiano</string>
   <string name="ble_access">Accesso BLE</string>
   <string name="ble_shared_key">Chiave condivisa BLE</string>
   <string name="ble_secret_hint">Inserisci lo stesso secret configurato nel firmware ESPHome</string>
@@ -47,6 +56,10 @@
   <string name="status_peripheral_weak">periferica debole</string>
   <string name="status_peripheral_out_of_range">periferica fuori zona</string>
   <string name="log_copied">Log copiato</string>
+  <string name="app_locked">App bloccata</string>
+  <string name="app_locked_description">Autenticati una volta per usare l\'app.</string>
+  <string name="unlock_app">Sblocca app</string>
+  <string name="authenticating">Autenticazione...</string>
   <string name="confirm_action">Conferma azione</string>
   <string name="auth_subtitle">Usa impronta o PIN per continuare</string>
 </resources>

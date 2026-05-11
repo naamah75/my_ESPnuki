@@ -5,11 +5,13 @@
   <string name="nav_home">Home</string>
   <string name="nav_actions">Actions</string>
   <string name="nav_settings">Settings</string>
+  <string name="nav_advanced">Advanced</string>
   <string name="nav_info">Info</string>
   <string name="quick_actions">Quick actions</string>
   <string name="refresh_ble_data">Refresh BLE data</string>
   <string name="ble_scan">BLE scan</string>
   <string name="copy_log">Copy log</string>
+  <string name="no_device">no BLE</string>
   <string name="status_unlocked">unlocked</string>
   <string name="status_locked">locked</string>
   <string name="actions_subtitle">Local Nuki-style controls via BLE</string>
@@ -19,7 +21,14 @@
   <string name="auto_open_description">Enable or disable automation from the device</string>
   <string name="peripheral">Peripheral</string>
   <string name="restart_esp32">Restart ESP32</string>
+  <string name="advanced_subtitle">Diagnostic actions and BLE tools</string>
+  <string name="advanced_ble_tools">BLE tools</string>
   <string name="settings_subtitle">Security and app behavior</string>
+  <string name="language">Language</string>
+  <string name="language_description">Choose the app language or follow the Android system language.</string>
+  <string name="language_system">System language</string>
+  <string name="language_english">English</string>
+  <string name="language_italian">Italian</string>
   <string name="ble_access">BLE access</string>
   <string name="ble_shared_key">BLE shared key</string>
   <string name="ble_secret_hint">Enter the same secret configured in the ESPHome firmware</string>
@@ -47,6 +56,10 @@
   <string name="status_peripheral_weak">weak peripheral</string>
   <string name="status_peripheral_out_of_range">peripheral out of range</string>
   <string name="log_copied">Log copied</string>
+  <string name="app_locked">App locked</string>
+  <string name="app_locked_description">Authenticate once to use the app.</string>
+  <string name="unlock_app">Unlock app</string>
+  <string name="authenticating">Authenticating...</string>
   <string name="confirm_action">Confirm action</string>
   <string name="auth_subtitle">Use fingerprint or PIN to continue</string>
 </resources>

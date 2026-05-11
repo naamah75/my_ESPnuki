@@ -76,6 +76,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
@@ -252,7 +253,7 @@ private fun HeaderRow(onOpenMenu: () -> Unit) {
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.sp,
       )
-      Text(text = "accesso BLE locale", color = SoftText, style = MaterialTheme.typography.labelSmall)
+      Text(text = stringResource(R.string.subtitle_ble_local_access), color = SoftText, style = MaterialTheme.typography.labelSmall)
     }
     Spacer(modifier = Modifier.size(10.dp))
   }
@@ -276,21 +277,21 @@ private fun DrawerContent(
       modifier = Modifier.padding(horizontal = 24.dp),
     )
     Spacer(modifier = Modifier.height(24.dp))
-    DrawerItem("Home", currentScreen == AppScreen.HOME) { onNavigate(AppScreen.HOME) }
-    DrawerItem("Azioni", currentScreen == AppScreen.ACTIONS) { onNavigate(AppScreen.ACTIONS) }
-    DrawerItem("Impostazioni", currentScreen == AppScreen.SETTINGS) { onNavigate(AppScreen.SETTINGS) }
-    DrawerItem("Info", currentScreen == AppScreen.INFO) { onNavigate(AppScreen.INFO) }
+    DrawerItem(stringResource(R.string.nav_home), currentScreen == AppScreen.HOME) { onNavigate(AppScreen.HOME) }
+    DrawerItem(stringResource(R.string.nav_actions), currentScreen == AppScreen.ACTIONS) { onNavigate(AppScreen.ACTIONS) }
+    DrawerItem(stringResource(R.string.nav_settings), currentScreen == AppScreen.SETTINGS) { onNavigate(AppScreen.SETTINGS) }
+    DrawerItem(stringResource(R.string.nav_info), currentScreen == AppScreen.INFO) { onNavigate(AppScreen.INFO) }
     Spacer(modifier = Modifier.height(24.dp))
     Text(
-      text = "Azioni rapide",
+      text = stringResource(R.string.quick_actions),
       color = SoftText,
       style = MaterialTheme.typography.labelLarge,
       modifier = Modifier.padding(horizontal = 24.dp),
     )
-    DrawerItem("Aggiorna dati BLE", false, onRefresh)
-    DrawerItem("Scansione BLE", false, onScan)
+    DrawerItem(stringResource(R.string.refresh_ble_data), false, onRefresh)
+    DrawerItem(stringResource(R.string.ble_scan), false, onScan)
     if (hasLog) {
-      DrawerItem("Copia log", false, onCopyLog)
+      DrawerItem(stringResource(R.string.copy_log), false, onCopyLog)
     }
   }
 }
@@ -314,10 +315,10 @@ private fun DrawerItem(title: String, selected: Boolean, onClick: () -> Unit) {
 private fun HomeScreen(uiState: DoorUiState, onOpenDoor: () -> Unit) {
   val relayActive = peripheralValue(uiState.peripheralFields, "Relay attivo") == "On"
   val centerLabel = when {
-    relayActive -> "sbloccato"
-    uiState.status == "connessione in corso" -> "sbloccato"
-    uiState.status == "sblocco in corso" -> "sbloccato"
-    else -> "bloccato"
+    relayActive -> stringResource(R.string.status_unlocked)
+    uiState.status == "connessione in corso" -> stringResource(R.string.status_unlocked)
+    uiState.status == "sblocco in corso" -> stringResource(R.string.status_unlocked)
+    else -> stringResource(R.string.status_locked)
   }
 
   Column(
@@ -374,17 +375,17 @@ private fun ActionsScreen(
       .verticalScroll(rememberScrollState()),
     verticalArrangement = Arrangement.spacedBy(16.dp),
   ) {
-    Text(text = "Azioni", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-    Text(text = "Controlli locali in stile Nuki via BLE", color = SoftText)
-    ActionCard(title = "Automazione apertura") {
+    Text(text = stringResource(R.string.nav_actions), color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text(text = stringResource(R.string.actions_subtitle), color = SoftText)
+    ActionCard(title = stringResource(R.string.auto_open)) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Column(modifier = Modifier.weight(1f)) {
-          Text(text = if (autoOpenEnabled) "Abilitata" else "Disabilitata", color = AccentYellow, style = MaterialTheme.typography.titleMedium)
-          Text(text = "Attiva o disattiva l'automazione dal dispositivo", color = SoftText)
+          Text(text = if (autoOpenEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled), color = AccentYellow, style = MaterialTheme.typography.titleMedium)
+          Text(text = stringResource(R.string.auto_open_description), color = SoftText)
         }
         Switch(
           checked = autoOpenEnabled,
@@ -394,13 +395,13 @@ private fun ActionsScreen(
         )
       }
     }
-    ActionCard(title = "Periferica") {
+    ActionCard(title = stringResource(R.string.peripheral)) {
       OutlinedButton(onClick = onRefresh, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Aggiorna dati BLE", color = AccentYellow)
+        Text(stringResource(R.string.refresh_ble_data), color = AccentYellow)
       }
       Spacer(modifier = Modifier.height(12.dp))
       OutlinedButton(onClick = onRestart, enabled = !uiState.isBusy, modifier = Modifier.fillMaxWidth()) {
-        Text("Riavvia ESP32", color = AccentYellow)
+        Text(stringResource(R.string.restart_esp32), color = AccentYellow)
       }
     }
   }
@@ -420,11 +421,11 @@ private fun SettingsScreen(
       .verticalScroll(rememberScrollState()),
     verticalArrangement = Arrangement.spacedBy(16.dp),
   ) {
-    Text(text = "Impostazioni", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-    Text(text = "Sicurezza e comportamento dell'app", color = SoftText)
-    ActionCard(title = "Accesso BLE") {
+    Text(text = stringResource(R.string.nav_settings), color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text(text = stringResource(R.string.settings_subtitle), color = SoftText)
+    ActionCard(title = stringResource(R.string.ble_access)) {
       Text(
-        text = if (uiState.bleSharedSecretConfigured) "Chiave condivisa BLE" else "Inserisci lo stesso secret configurato nel firmware ESPHome",
+        text = if (uiState.bleSharedSecretConfigured) stringResource(R.string.ble_shared_key) else stringResource(R.string.ble_secret_hint),
         color = if (uiState.bleSharedSecretConfigured) AccentYellow else SoftText,
       )
       Spacer(modifier = Modifier.height(12.dp))
@@ -433,7 +434,7 @@ private fun SettingsScreen(
         onValueChange = { secretInput = it },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        label = { Text("BLE shared secret", color = SoftText) },
+        label = { Text(stringResource(R.string.ble_shared_secret), color = SoftText) },
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
         colors = OutlinedTextFieldDefaults.colors(
           focusedTextColor = Color.White,
@@ -460,7 +461,7 @@ private fun SettingsScreen(
             contentColor = AppBackground,
           ),
         ) {
-          Text(if (uiState.bleSharedSecretConfigured) "Aggiorna" else "Salva")
+          Text(if (uiState.bleSharedSecretConfigured) stringResource(R.string.update) else stringResource(R.string.save))
         }
         OutlinedButton(
           onClick = {
@@ -469,26 +470,26 @@ private fun SettingsScreen(
           },
           modifier = Modifier.weight(1f),
         ) {
-          Text("Rimuovi", color = AccentYellow)
+          Text(stringResource(R.string.remove), color = AccentYellow)
         }
       }
       Spacer(modifier = Modifier.height(8.dp))
       Text(
-        text = "Il valore deve coincidere con ble_shared_secret nel file secrets.yaml del firmware.",
+        text = stringResource(R.string.ble_secret_note),
         color = SoftText,
         style = MaterialTheme.typography.bodySmall,
       )
     }
-    ActionCard(title = "Sicurezza") {
+    ActionCard(title = stringResource(R.string.security)) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Column(modifier = Modifier.weight(1f)) {
-          Text(text = "Impronta o PIN", color = AccentYellow, style = MaterialTheme.typography.titleMedium)
+          Text(text = stringResource(R.string.fingerprint_or_pin), color = AccentYellow, style = MaterialTheme.typography.titleMedium)
           Text(
-            text = if (uiState.biometricAvailable) "Richiedi l'autenticazione Android per sblocco e azioni sensibili" else "Autenticazione biometrica o PIN non disponibile su questo dispositivo",
+            text = if (uiState.biometricAvailable) stringResource(R.string.biometric_enabled_description) else stringResource(R.string.biometric_unavailable_description),
             color = SoftText,
           )
         }
@@ -526,15 +527,15 @@ private fun InfoScreen(uiState: DoorUiState) {
       .verticalScroll(rememberScrollState()),
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    Text(text = "Info", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text(text = stringResource(R.string.nav_info), color = Color.White, style = MaterialTheme.typography.headlineMedium)
     EspNukiLogoCard()
-    InfoRow("Versione", BuildConfig.VERSION_NAME)
+    InfoRow(stringResource(R.string.version), BuildConfig.VERSION_NAME)
     InfoRow("Build", BuildConfig.BUILD_TIMESTAMP)
     InfoRow("Device BLE", BleDoorConfig.deviceName)
-    InfoRow("Repository GitHub", BuildConfig.REPOSITORY_URL)
+    InfoRow(stringResource(R.string.github_repository), BuildConfig.REPOSITORY_URL)
     if (uiState.log.isNotEmpty()) {
       Spacer(modifier = Modifier.height(8.dp))
-      Text(text = "Ultimo log", color = Color.White, style = MaterialTheme.typography.titleMedium)
+      Text(text = stringResource(R.string.last_log), color = Color.White, style = MaterialTheme.typography.titleMedium)
       Text(text = uiState.log, color = SoftText, style = MaterialTheme.typography.bodySmall)
     }
   }
@@ -665,7 +666,7 @@ private fun DiagnosticsSheet(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Column {
-        Text(text = "Ingresso", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Text(text = stringResource(R.string.entrance), color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Text(text = subtitle, color = SoftText, style = MaterialTheme.typography.bodyLarge)
       }
       Text(text = peripheralValue(uiState.peripheralFields, "WiFi Signal") ?: "--", color = AccentYellow, style = MaterialTheme.typography.titleLarge)
@@ -673,17 +674,17 @@ private fun DiagnosticsSheet(
     Spacer(modifier = Modifier.height(16.dp))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
       if (networkFields.isNotEmpty()) {
-        item { SheetSectionTitle("Rete") }
+        item { SheetSectionTitle(stringResource(R.string.network)) }
         items(networkFields) { field -> PeripheralFieldRow(field) }
       }
       if (systemFields.isNotEmpty()) {
-        item { SheetSectionTitle("Diagnostica") }
+        item { SheetSectionTitle(stringResource(R.string.diagnostics)) }
         items(systemFields) { field -> PeripheralFieldRow(field) }
       }
       if (uiState.scanResults.isNotEmpty()) {
         item {
           Spacer(modifier = Modifier.height(8.dp))
-          Text(text = "Periferiche BLE viste", color = Color.White, style = MaterialTheme.typography.titleMedium)
+          Text(text = stringResource(R.string.seen_ble_peripherals), color = Color.White, style = MaterialTheme.typography.titleMedium)
         }
         items(uiState.scanResults) { item ->
           Text(text = item, color = SoftText, style = MaterialTheme.typography.bodySmall)
@@ -724,19 +725,20 @@ private fun peripheralValue(fields: List<PeripheralField>, label: String): Strin
   return fields.firstOrNull { it.label == label }?.value
 }
 
+@Composable
 private fun statusSubtitle(uiState: DoorUiState): String {
-  if (uiState.status == "connessione in corso") return "connessione in corso"
-  if (uiState.status == "sblocco in corso") return "sblocco in corso"
-  if (uiState.status == "blocco in corso") return "blocco in corso"
+  if (uiState.status == "connessione in corso") return stringResource(R.string.status_connecting)
+  if (uiState.status == "sblocco in corso") return stringResource(R.string.status_unlocking)
+  if (uiState.status == "blocco in corso") return stringResource(R.string.status_locking)
 
   val rssi = uiState.lastSeenRssi
   if (rssi == null) return uiState.status
 
   return when {
-    rssi >= -60 -> "periferica a portata"
-    rssi >= -72 -> "periferica vicina"
-    rssi >= -84 -> "periferica debole"
-    else -> "periferica fuori zona"
+    rssi >= -60 -> stringResource(R.string.status_peripheral_in_range)
+    rssi >= -72 -> stringResource(R.string.status_peripheral_nearby)
+    rssi >= -84 -> stringResource(R.string.status_peripheral_weak)
+    else -> stringResource(R.string.status_peripheral_out_of_range)
   }
 }
 
@@ -753,7 +755,7 @@ private fun nukiSwitchColors() = SwitchDefaults.colors(
 private fun copyLogToClipboard(context: Context, text: String) {
   val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
   clipboard.setPrimaryClip(ClipData.newPlainText("ESPnuki BLE Log", text))
-  Toast.makeText(context, "Log copiato", Toast.LENGTH_SHORT).show()
+  Toast.makeText(context, context.getString(R.string.log_copied), Toast.LENGTH_SHORT).show()
 }
 
 private fun authenticateWithDevice(context: FragmentActivity, onSuccess: () -> Unit) {
@@ -774,8 +776,8 @@ private fun authenticateWithDevice(context: FragmentActivity, onSuccess: () -> U
     },
   )
   val promptInfo = BiometricPrompt.PromptInfo.Builder()
-    .setTitle("Conferma azione")
-    .setSubtitle("Usa impronta o PIN per continuare")
+    .setTitle(context.getString(R.string.confirm_action))
+    .setSubtitle(context.getString(R.string.auth_subtitle))
     .setAllowedAuthenticators(authenticators)
     .build()
   prompt.authenticate(promptInfo)

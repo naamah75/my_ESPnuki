@@ -29,7 +29,7 @@ android {
     minSdk = 26
     targetSdk = 34
     versionCode = 1
-    versionName = "0.1.0"
+    versionName = "0.9 beta"
     buildConfigField("String", "BUILD_TIMESTAMP", "\"$buildTimestamp\"")
     buildConfigField("String", "BLE_SHARED_SECRET", "\"$bleSharedSecret\"")
     buildConfigField("String", "REPOSITORY_URL", "\"$repositoryUrl\"")

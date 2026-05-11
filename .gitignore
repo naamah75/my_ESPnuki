@@ -29,6 +29,12 @@ Thumbs.db
 *.pem
 *.key
 
+# ESPHome secrets and local-only configs
+secrets.yaml
+**/secrets.yaml
+*.local.yaml
+*.private.yaml
+
 # Crash and profiling artifacts
 *.hprof
 

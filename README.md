@@ -72,6 +72,13 @@ Android sceglie automaticamente la lingua in base alla lingua di sistema del dis
 - stima qualitativa della prossimita' BLE (`a portata`, `vicina`, `debole`, `fuori zona`)
 - supporto biometria/PIN opzionale per le azioni sensibili
 
+## Screenshot
+
+<p>
+  <img src="docs/screenshots/Screenshot_20260511_133321.png" alt="ESPnuki home no BLE" width="260" />
+  <img src="docs/screenshots/Screenshot_20260511_133337.png" alt="ESPnuki settings" width="260" />
+</p>
+
 ## Sicurezza e dati sensibili
 
 Il repository pubblico non include segreti reali.
